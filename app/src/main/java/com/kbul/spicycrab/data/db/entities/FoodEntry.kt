@@ -17,6 +17,7 @@ data class FoodEntry(
     val carbsG: Double,
     val fatG: Double,
     val fiberG: Double,
+    val sodiumMg: Double = 0.0,
     val comment: String,
     val modelUsed: String,
     val confidence: String,

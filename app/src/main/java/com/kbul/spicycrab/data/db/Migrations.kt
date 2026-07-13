@@ -12,6 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   v5: weight_entries gains lastModifiedEpoch
  *   v6: + meal_presets
  *   v7: + journal_entries
+ *   v8: food_entries and meal_presets gain sodiumMg
  *
  * Early development used `fallbackToDestructiveMigration()`, so v1–v3 schema
  * JSONs were never exported. The migrations below exist as defensive paths
@@ -181,4 +182,70 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE food_entries_new (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                timestampEpoch INTEGER NOT NULL,
+                lastModifiedEpoch INTEGER NOT NULL,
+                itemName TEXT NOT NULL,
+                grams REAL NOT NULL,
+                kcal REAL NOT NULL,
+                proteinG REAL NOT NULL,
+                carbsG REAL NOT NULL,
+                fatG REAL NOT NULL,
+                fiberG REAL NOT NULL,
+                sodiumMg REAL NOT NULL,
+                comment TEXT NOT NULL,
+                modelUsed TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                imagePath TEXT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO food_entries_new
+                (id, timestampEpoch, lastModifiedEpoch, itemName, grams, kcal,
+                 proteinG, carbsG, fatG, fiberG, sodiumMg, comment, modelUsed, confidence, imagePath)
+            SELECT id, timestampEpoch, lastModifiedEpoch, itemName, grams, kcal,
+                   proteinG, carbsG, fatG, fiberG, 0.0, comment, modelUsed, confidence, imagePath
+            FROM food_entries
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE food_entries")
+        db.execSQL("ALTER TABLE food_entries_new RENAME TO food_entries")
+
+        db.execSQL(
+            """
+            CREATE TABLE meal_presets_new (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                grams REAL NOT NULL,
+                kcal REAL NOT NULL,
+                proteinG REAL NOT NULL,
+                carbsG REAL NOT NULL,
+                fatG REAL NOT NULL,
+                fiberG REAL NOT NULL,
+                sodiumMg REAL NOT NULL,
+                comment TEXT NOT NULL,
+                createdEpoch INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO meal_presets_new
+                (id, name, grams, kcal, proteinG, carbsG, fatG, fiberG, sodiumMg, comment, createdEpoch)
+            SELECT id, name, grams, kcal, proteinG, carbsG, fatG, fiberG, 0.0, comment, createdEpoch
+            FROM meal_presets
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE meal_presets")
+        db.execSQL("ALTER TABLE meal_presets_new RENAME TO meal_presets")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)

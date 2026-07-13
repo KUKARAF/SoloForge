@@ -15,6 +15,7 @@ data class MealPreset(
     val carbsG: Double,
     val fatG: Double,
     val fiberG: Double,
+    val sodiumMg: Double = 0.0,
     val comment: String,
     val createdEpoch: Long,
 )

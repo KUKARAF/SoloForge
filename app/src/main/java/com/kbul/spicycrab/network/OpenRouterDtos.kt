@@ -45,6 +45,7 @@ data class NutritionEstimateDto(
     @SerialName("carbs_g") val carbsG: Double,
     @SerialName("fat_g") val fatG: Double,
     @SerialName("fiber_g") val fiberG: Double = 0.0,
+    @SerialName("sodium_mg") val sodiumMg: Double = 0.0,
     val confidence: String = "medium",
     val notes: String = "",
 )

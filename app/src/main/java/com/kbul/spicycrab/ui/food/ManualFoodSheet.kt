@@ -85,6 +85,7 @@ fun ManualFoodSheet(
             NumField("Carbs (g)", draft.carbsG) { draft = draft.copy(carbsG = it) }
             NumField("Fat (g)", draft.fatG) { draft = draft.copy(fatG = it) }
             NumField("Fiber (g)", draft.fiberG) { draft = draft.copy(fiberG = it) }
+            NumField("Sodium (mg)", draft.sodiumMg) { draft = draft.copy(sodiumMg = it) }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -117,6 +118,7 @@ private fun emptyDraft(): FoodEntry = FoodEntry(
     carbsG = 0.0,
     fatG = 0.0,
     fiberG = 0.0,
+    sodiumMg = 0.0,
     comment = "",
     modelUsed = "manual",
     confidence = "user",
@@ -133,6 +135,7 @@ private fun scaleEntry(entry: FoodEntry, newGrams: Double): FoodEntry {
         carbsG = entry.carbsG * r,
         fatG = entry.fatG * r,
         fiberG = entry.fiberG * r,
+        sodiumMg = entry.sodiumMg * r,
     )
 }
 

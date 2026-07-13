@@ -14,12 +14,15 @@ object VisionPrompts {
           "carbs_g": number,
           "fat_g": number,
           "fiber_g": number,
+          "sodium_mg": number,
           "confidence": "low" | "medium" | "high",
           "notes": string
         }
 
         Rules:
         - Numbers must be plain numbers (no units, no ranges).
+        - sodium_mg is total sodium in milligrams, including salt from processing, seasoning,
+          sauces, condiments, and typical preparation — not just visible salt.
         - If multiple items are visible, sum them and describe the meal in item_name.
         - Trust the user comment over visual ambiguity.
         - Use "low" confidence when the photo is unclear or portion size is hard to judge.

@@ -196,6 +196,7 @@ class FoodViewModel @Inject constructor(
                             carbsG = est.carbsG,
                             fatG = est.fatG,
                             fiberG = est.fiberG,
+                            sodiumMg = est.sodiumMg,
                             confidence = est.confidence,
                             comment = updatedComment,
                             modelUsed = est.modelUsed,

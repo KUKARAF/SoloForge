@@ -8,6 +8,7 @@ data class NutritionEstimate(
     val carbsG: Double,
     val fatG: Double,
     val fiberG: Double,
+    val sodiumMg: Double = 0.0,
     val confidence: String,
     val notes: String,
     val modelUsed: String = "",

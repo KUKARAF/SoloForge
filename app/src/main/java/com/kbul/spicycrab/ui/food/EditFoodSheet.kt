@@ -99,6 +99,7 @@ fun EditFoodSheet(
             NumField("Carbs (g)", draft.carbsG) { draft = draft.copy(carbsG = it) }
             NumField("Fat (g)", draft.fatG) { draft = draft.copy(fatG = it) }
             NumField("Fiber (g)", draft.fiberG) { draft = draft.copy(fiberG = it) }
+            NumField("Sodium (mg)", draft.sodiumMg) { draft = draft.copy(sodiumMg = it) }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -175,6 +176,7 @@ private fun scaleEntry(entry: FoodEntry, newGrams: Double): FoodEntry {
         carbsG = entry.carbsG * r,
         fatG = entry.fatG * r,
         fiberG = entry.fiberG * r,
+        sodiumMg = entry.sodiumMg * r,
     )
 }
 

@@ -171,8 +171,9 @@ private fun FoodRow(entry: FoodEntry, onClick: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(14.dp)) {
             Text(entry.itemName, style = MaterialTheme.typography.titleMedium)
+            val sodium = if (entry.sodiumMg > 0.0) " · Na ${entry.sodiumMg.toInt()}mg" else ""
             Text(
-                "${entry.kcal.toInt()} kcal · P${entry.proteinG.toInt()} / C${entry.carbsG.toInt()} / F${entry.fatG.toInt()}",
+                "${entry.kcal.toInt()} kcal · P${entry.proteinG.toInt()} / C${entry.carbsG.toInt()} / F${entry.fatG.toInt()}$sodium",
                 style = MaterialTheme.typography.bodyMedium,
             )
             val edited = entry.lastModifiedEpoch > entry.timestampEpoch

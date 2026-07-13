@@ -141,6 +141,7 @@ private fun EstimateForm(
             NumberField("Carbs (g)", est.carbsG) { onUpdate(est.copy(carbsG = it)) }
             NumberField("Fat (g)", est.fatG) { onUpdate(est.copy(fatG = it)) }
             NumberField("Fiber (g)", est.fiberG) { onUpdate(est.copy(fiberG = it)) }
+            NumberField("Sodium (mg)", est.sodiumMg) { onUpdate(est.copy(sodiumMg = it)) }
             if (est.notes.isNotBlank()) {
                 Text(
                     "Notes: ${est.notes}",
@@ -182,6 +183,7 @@ private fun scaleEstimate(est: NutritionEstimate, newGrams: Double): NutritionEs
         carbsG = est.carbsG * r,
         fatG = est.fatG * r,
         fiberG = est.fiberG * r,
+        sodiumMg = est.sodiumMg * r,
     )
 }
 
