@@ -13,4 +13,7 @@ data class NutritionEstimate(
     val notes: String,
     val modelUsed: String = "",
     val detailPrompt: String = "",
+    val peopleCount: Int = 1,
+    /** True for barcode-scanned pantry items: not assumed eaten until the user confirms. */
+    val pendingConsumption: Boolean = false,
 )

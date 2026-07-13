@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.MealPreset
 import com.kbul.spicycrab.data.prefs.SettingsRepo
+import com.kbul.spicycrab.domain.barcode.ProductLookupRepository
+import com.kbul.spicycrab.domain.barcode.toNutritionEstimate
 import com.kbul.spicycrab.domain.nutrition.FoodRepository
 import com.kbul.spicycrab.domain.nutrition.NutritionEstimate
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,11 +44,17 @@ data class EditingState(
 @HiltViewModel
 class FoodViewModel @Inject constructor(
     private val repository: FoodRepository,
+    private val productLookup: ProductLookupRepository,
     settings: SettingsRepo,
 ) : ViewModel() {
 
     val aiEnabled: StateFlow<Boolean> = settings.settings.map { it.aiFeaturesEnabled }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    val barcodeScanningEnabled: StateFlow<Boolean> = settings.settings.map { productLookup.isConfigured() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private var pendingBarcode: String? = null
 
     private val _mode = MutableStateFlow<FoodUiMode>(FoodUiMode.List)
     val mode: StateFlow<FoodUiMode> = _mode.asStateFlow()
@@ -67,6 +75,7 @@ class FoodViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun goToCapture() {
+        pendingBarcode = null
         _mode.value = FoodUiMode.Capture
     }
 
@@ -75,12 +84,30 @@ class FoodViewModel @Inject constructor(
         _mode.value = FoodUiMode.Analyze(imageFile = null)
     }
 
+    fun onBarcodeDetected(barcode: String) {
+        pendingBarcode = barcode
+    }
+
     fun onCaptured(file: File) {
         _analyze.value = AnalyzeState()
         _mode.value = FoodUiMode.Analyze(file)
+
+        val barcode = pendingBarcode ?: return
+        pendingBarcode = null
+        _analyze.value = _analyze.value.copy(isLoading = true)
+        viewModelScope.launch {
+            val product = runCatching { productLookup.lookup(barcode) }.getOrNull()
+            if ((_mode.value as? FoodUiMode.Analyze)?.imageFile != file) return@launch
+            _analyze.value = if (product != null) {
+                _analyze.value.copy(isLoading = false, estimate = product.toNutritionEstimate())
+            } else {
+                _analyze.value.copy(isLoading = false)
+            }
+        }
     }
 
     fun onCaptureCancelled() {
+        pendingBarcode = null
         _mode.value = FoodUiMode.List
     }
 
@@ -149,6 +176,15 @@ class FoodViewModel @Inject constructor(
         viewModelScope.launch {
             repository.delete(entry)
             _editing.value = null
+        }
+    }
+
+    fun markConsumed(entry: FoodEntry) {
+        viewModelScope.launch {
+            val updated = repository.markConsumed(entry)
+            if (_editing.value?.entry?.id == entry.id) {
+                _editing.value = _editing.value?.copy(entry = updated)
+            }
         }
     }
 

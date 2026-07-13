@@ -48,6 +48,23 @@ class SettingsViewModel @Inject constructor(
         _hasKey.value = false
     }
 
+    private val _hasGristKey = MutableStateFlow(keyStore.hasGristApiKey())
+    val hasGristKey: StateFlow<Boolean> = _hasGristKey.asStateFlow()
+
+    fun setGristApiKey(value: String) {
+        keyStore.setGristApiKey(value.takeIf { it.isNotBlank() })
+        _hasGristKey.value = keyStore.hasGristApiKey()
+    }
+
+    fun clearGristApiKey() {
+        keyStore.setGristApiKey(null)
+        _hasGristKey.value = false
+    }
+
+    fun setGristBaseUrl(value: String) = viewModelScope.launch { settings.setGristBaseUrl(value) }
+    fun setGristDocId(value: String) = viewModelScope.launch { settings.setGristDocId(value) }
+    fun setGristTableId(value: String) = viewModelScope.launch { settings.setGristTableId(value) }
+
     fun setExportFolder(uri: String?) = viewModelScope.launch { settings.setExportFolderUri(uri) }
 
     fun setSavePhotoLocally(value: Boolean) = viewModelScope.launch { settings.setSavePhotoLocally(value) }

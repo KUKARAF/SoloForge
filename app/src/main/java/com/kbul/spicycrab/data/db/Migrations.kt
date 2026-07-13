@@ -13,6 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   v6: + meal_presets
  *   v7: + journal_entries
  *   v8: food_entries and meal_presets gain sodiumMg
+ *   v9: food_entries gains peopleCount, consumedEpoch, addedEpoch
  *
  * Early development used `fallbackToDestructiveMigration()`, so v1–v3 schema
  * JSONs were never exported. The migrations below exist as defensive paths
@@ -248,4 +249,47 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE food_entries_new (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                timestampEpoch INTEGER NOT NULL,
+                lastModifiedEpoch INTEGER NOT NULL,
+                itemName TEXT NOT NULL,
+                grams REAL NOT NULL,
+                kcal REAL NOT NULL,
+                proteinG REAL NOT NULL,
+                carbsG REAL NOT NULL,
+                fatG REAL NOT NULL,
+                fiberG REAL NOT NULL,
+                sodiumMg REAL NOT NULL,
+                comment TEXT NOT NULL,
+                modelUsed TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                imagePath TEXT,
+                peopleCount INTEGER NOT NULL,
+                consumedEpoch INTEGER,
+                addedEpoch INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO food_entries_new
+                (id, timestampEpoch, lastModifiedEpoch, itemName, grams, kcal,
+                 proteinG, carbsG, fatG, fiberG, sodiumMg, comment, modelUsed, confidence, imagePath,
+                 peopleCount, consumedEpoch, addedEpoch)
+            SELECT id, timestampEpoch, lastModifiedEpoch, itemName, grams, kcal,
+                   proteinG, carbsG, fatG, fiberG, sodiumMg, comment, modelUsed, confidence, imagePath,
+                   1, timestampEpoch, timestampEpoch
+            FROM food_entries
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE food_entries")
+        db.execSQL("ALTER TABLE food_entries_new RENAME TO food_entries")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)

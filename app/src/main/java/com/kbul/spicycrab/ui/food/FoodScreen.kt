@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
@@ -29,6 +31,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.MealPreset
+import com.kbul.spicycrab.domain.nutrition.shareCarbsG
+import com.kbul.spicycrab.domain.nutrition.shareFatG
+import com.kbul.spicycrab.domain.nutrition.shareKcal
+import com.kbul.spicycrab.domain.nutrition.shareProteinG
+import com.kbul.spicycrab.domain.nutrition.shareSodiumMg
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -42,6 +49,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
     val editing by viewModel.editing.collectAsStateWithLifecycle()
     val manualOpen by viewModel.manualOpen.collectAsStateWithLifecycle()
     val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
+    val barcodeScanningEnabled by viewModel.barcodeScanningEnabled.collectAsStateWithLifecycle()
 
     when (val m = mode) {
         FoodUiMode.List -> FoodListContent(
@@ -54,10 +62,13 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onRowClick = viewModel::openEdit,
             onLogPreset = viewModel::logPreset,
             onDeletePreset = viewModel::deletePreset,
+            onMarkConsumed = viewModel::markConsumed,
         )
         FoodUiMode.Capture -> CaptureScreen(
             onCaptured = viewModel::onCaptured,
             onCancel = viewModel::onCaptureCancelled,
+            barcodeScanningEnabled = barcodeScanningEnabled,
+            onBarcodeDetected = viewModel::onBarcodeDetected,
         )
         is FoodUiMode.Analyze -> AnalyzeScreen(
             imageFile = m.imageFile,
@@ -78,6 +89,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onDelete = viewModel::deleteEntry,
             onReanalyze = viewModel::reanalyzeEdit,
             onSaveAsPreset = viewModel::saveAsPreset,
+            onMarkConsumed = viewModel::markConsumed,
             onDismiss = viewModel::dismissEdit,
         )
     }
@@ -102,7 +114,9 @@ private fun FoodListContent(
     onRowClick: (FoodEntry) -> Unit,
     onLogPreset: (MealPreset) -> Unit,
     onDeletePreset: (MealPreset) -> Unit,
+    onMarkConsumed: (FoodEntry) -> Unit,
 ) {
+    val (pending, consumed) = entries.partition { it.consumedEpoch == null }
     Scaffold(
         floatingActionButton = {
             androidx.compose.foundation.layout.Column(
@@ -156,7 +170,23 @@ private fun FoodListContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
             ) {
-                items(entries, key = { it.id }) { entry -> FoodRow(entry, onClick = { onRowClick(entry) }) }
+                if (pending.isNotEmpty()) {
+                    item(key = "pending-header") {
+                        Text(
+                            "Mark as consumed",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    items(pending, key = { "pending-${it.id}" }) { entry ->
+                        PendingFoodRow(
+                            entry,
+                            onClick = { onRowClick(entry) },
+                            onMarkConsumed = { onMarkConsumed(entry) },
+                        )
+                    }
+                }
+                items(consumed, key = { it.id }) { entry -> FoodRow(entry, onClick = { onRowClick(entry) }) }
             }
         }
     }
@@ -171,9 +201,10 @@ private fun FoodRow(entry: FoodEntry, onClick: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(14.dp)) {
             Text(entry.itemName, style = MaterialTheme.typography.titleMedium)
-            val sodium = if (entry.sodiumMg > 0.0) " · Na ${entry.sodiumMg.toInt()}mg" else ""
+            val sodium = if (entry.shareSodiumMg > 0.0) " · Na ${entry.shareSodiumMg.toInt()}mg" else ""
+            val shared = if (entry.peopleCount > 1) " · your share of ${entry.peopleCount}" else ""
             Text(
-                "${entry.kcal.toInt()} kcal · P${entry.proteinG.toInt()} / C${entry.carbsG.toInt()} / F${entry.fatG.toInt()}$sodium",
+                "${entry.shareKcal.toInt()} kcal · P${entry.shareProteinG.toInt()} / C${entry.shareCarbsG.toInt()} / F${entry.shareFatG.toInt()}$sodium$shared",
                 style = MaterialTheme.typography.bodyMedium,
             )
             val edited = entry.lastModifiedEpoch > entry.timestampEpoch
@@ -185,6 +216,24 @@ private fun FoodRow(entry: FoodEntry, onClick: () -> Unit) {
             if (entry.comment.isNotBlank()) {
                 Text("“${entry.comment}”", style = MaterialTheme.typography.bodyMedium)
             }
+        }
+    }
+}
+
+@Composable
+private fun PendingFoodRow(entry: FoodEntry, onClick: () -> Unit, onMarkConsumed: () -> Unit) {
+    ElevatedCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Column(Modifier.padding(14.dp)) {
+            Text(entry.itemName, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${entry.kcal.toInt()} kcal total · not yet marked as consumed",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = onMarkConsumed,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(40.dp),
+            ) { Text("Mark as consumed") }
         }
     }
 }

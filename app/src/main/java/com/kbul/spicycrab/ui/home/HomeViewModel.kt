@@ -14,6 +14,7 @@ import com.kbul.spicycrab.domain.fasting.FastingMode
 import com.kbul.spicycrab.domain.fasting.FastingRepository
 import com.kbul.spicycrab.domain.fasting.StreakCalculator
 import com.kbul.spicycrab.domain.nutrition.FoodRepository
+import com.kbul.spicycrab.domain.nutrition.shareKcal
 import com.kbul.spicycrab.domain.weight.WeightRepository
 import com.kbul.spicycrab.domain.workout.WorkoutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -254,7 +255,8 @@ internal fun buildCalendarDays(
             date = date,
             inMonth = YearMonth.from(date) == month,
             isToday = date == selectedToday,
-            kcal = foods.filter { it.timestampEpoch >= start && it.timestampEpoch < end }.sumOf { it.kcal },
+            kcal = foods.filter { it.timestampEpoch >= start && it.timestampEpoch < end && it.consumedEpoch != null }
+                .sumOf { it.shareKcal },
             baseCalorieGoal = baseCalorieGoal,
             calorieBudget = baseCalorieGoal + workoutBonus,
             meals = foods.filter { it.timestampEpoch >= start && it.timestampEpoch < end },

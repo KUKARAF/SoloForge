@@ -45,6 +45,7 @@ import com.kbul.spicycrab.domain.fasting.FastingMode
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
+    val hasGristKey by viewModel.hasGristKey.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val s = settings ?: return
@@ -93,6 +94,38 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        SectionCard("Barcode scanning") {
+            Text(
+                "Optional. Scans packaged food barcodes in the background while capturing a photo and prefills exact label nutrition from Open Food Facts, cached in your own Grist doc. Off by default; fill in all four fields to enable it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = s.gristBaseUrl ?: "",
+                onValueChange = viewModel::setGristBaseUrl,
+                label = { Text("Grist base URL") },
+                placeholder = { Text("https://csv.osmosis.page") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = s.gristDocId ?: "",
+                onValueChange = viewModel::setGristDocId,
+                label = { Text("Grist doc ID") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = s.gristTableId ?: "",
+                onValueChange = viewModel::setGristTableId,
+                label = { Text("Grist table ID") },
+                placeholder = { Text("Products") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            GristKeyField(hasGristKey, viewModel::setGristApiKey, viewModel::clearGristApiKey)
         }
 
         SectionCard("Daily nutrition goals") {
@@ -206,6 +239,35 @@ private fun ApiKeyField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () ->
         onValueChange = { input = it },
         label = { Text("OpenRouter API key") },
         placeholder = { Text("sk-or-…") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { onSet(input); input = "" },
+            enabled = input.isNotBlank(),
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text(if (hasKey) "Replace" else "Save") }
+        if (hasKey) {
+            OutlinedButton(
+                onClick = onClear,
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text("Clear") }
+        }
+    }
+}
+
+@Composable
+private fun GristKeyField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () -> Unit) {
+    var input by remember { mutableStateOf("") }
+    Text(
+        if (hasKey) "A Grist API key is set." else "No Grist API key set.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    OutlinedTextField(
+        value = input,
+        onValueChange = { input = it },
+        label = { Text("Grist API key") },
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth(),
     )

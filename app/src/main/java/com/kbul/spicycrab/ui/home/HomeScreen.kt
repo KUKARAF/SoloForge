@@ -49,6 +49,10 @@ import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.WeightEntry
 import com.kbul.spicycrab.data.prefs.NutritionGoals
 import com.kbul.spicycrab.domain.fasting.FastingMode
+import com.kbul.spicycrab.domain.nutrition.shareCarbsG
+import com.kbul.spicycrab.domain.nutrition.shareFatG
+import com.kbul.spicycrab.domain.nutrition.shareKcal
+import com.kbul.spicycrab.domain.nutrition.shareProteinG
 import com.kbul.spicycrab.domain.workout.WorkoutMode
 import com.kbul.spicycrab.ui.fasting.ProgressRing
 import com.kbul.spicycrab.ui.nav.TopLevelDest
@@ -383,9 +387,10 @@ private fun SelectedDayDetails(
             )
         }
         day.meals.forEach { meal ->
+            val pendingNote = if (meal.consumedEpoch == null) " (not yet consumed)" else ""
             EventLine(
                 label = "Meal",
-                value = "${meal.itemName} - ${meal.kcal.toInt()} kcal",
+                value = "${meal.itemName} - ${meal.shareKcal.toInt()} kcal$pendingNote",
                 color = MaterialTheme.colorScheme.primary,
             )
         }
@@ -587,10 +592,11 @@ private fun NutritionTile(
     workoutBonusKcal: Int,
     onClick: () -> Unit,
 ) {
-    val kcal = entries.sumOf { it.kcal }
-    val protein = entries.sumOf { it.proteinG }
-    val carbs = entries.sumOf { it.carbsG }
-    val fat = entries.sumOf { it.fatG }
+    val consumed = entries.filter { it.consumedEpoch != null }
+    val kcal = consumed.sumOf { it.shareKcal }
+    val protein = consumed.sumOf { it.shareProteinG }
+    val carbs = consumed.sumOf { it.shareCarbsG }
+    val fat = consumed.sumOf { it.shareFatG }
     val adjustedKcalGoal = goals.kcal + workoutBonusKcal
 
     ElevatedCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
@@ -623,7 +629,7 @@ private fun NutritionTile(
             MacroLine("Fat", fat, goals.fatG.toDouble())
 
             Text(
-                "${entries.size} ${if (entries.size == 1) "meal" else "meals"} tracked today",
+                "${consumed.size} ${if (consumed.size == 1) "meal" else "meals"} tracked today",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

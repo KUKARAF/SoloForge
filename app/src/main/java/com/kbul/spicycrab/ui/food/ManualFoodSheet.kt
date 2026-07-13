@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.ui.common.DateTimeField
+import com.kbul.spicycrab.ui.common.PeopleCountField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +87,7 @@ fun ManualFoodSheet(
             NumField("Fat (g)", draft.fatG) { draft = draft.copy(fatG = it) }
             NumField("Fiber (g)", draft.fiberG) { draft = draft.copy(fiberG = it) }
             NumField("Sodium (mg)", draft.sodiumMg) { draft = draft.copy(sodiumMg = it) }
+            PeopleCountField(value = draft.peopleCount, onChange = { draft = draft.copy(peopleCount = it) })
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(

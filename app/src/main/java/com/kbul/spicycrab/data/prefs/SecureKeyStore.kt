@@ -35,7 +35,18 @@ class SecureKeyStore @Inject constructor(
 
     fun hasOpenRouterKey(): Boolean = !getOpenRouterKey().isNullOrBlank()
 
+    fun getGristApiKey(): String? = prefs.getString(KEY_GRIST, null)
+
+    fun setGristApiKey(value: String?) {
+        prefs.edit().apply {
+            if (value.isNullOrBlank()) remove(KEY_GRIST) else putString(KEY_GRIST, value)
+        }.apply()
+    }
+
+    fun hasGristApiKey(): Boolean = !getGristApiKey().isNullOrBlank()
+
     private companion object {
         const val KEY_OPENROUTER = "openrouter_api_key"
+        const val KEY_GRIST = "grist_api_key"
     }
 }

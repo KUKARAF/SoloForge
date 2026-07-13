@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -29,10 +30,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,13 +45,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kbul.spicycrab.domain.barcode.BarcodeAnalyzer
 import java.io.File
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 @Composable
 fun CaptureScreen(
     onCaptured: (File) -> Unit,
     onCancel: () -> Unit,
+    barcodeScanningEnabled: Boolean = false,
+    onBarcodeDetected: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -76,15 +83,39 @@ fun CaptureScreen(
         return
     }
 
-    CameraContent(onCaptured = onCaptured, onCancel = onCancel)
+    CameraContent(
+        onCaptured = onCaptured,
+        onCancel = onCancel,
+        barcodeScanningEnabled = barcodeScanningEnabled,
+        onBarcodeDetected = onBarcodeDetected,
+    )
 }
 
 @Composable
-private fun CameraContent(onCaptured: (File) -> Unit, onCancel: () -> Unit) {
+private fun CameraContent(
+    onCaptured: (File) -> Unit,
+    onCancel: () -> Unit,
+    barcodeScanningEnabled: Boolean,
+    onBarcodeDetected: (String) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { ContextCompat.getMainExecutor(context) }
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val currentOnBarcodeDetected = rememberUpdatedState(onBarcodeDetected)
+
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) { onDispose { analysisExecutor.shutdown() } }
+
+    val imageAnalysis = remember(barcodeScanningEnabled) {
+        if (!barcodeScanningEnabled) return@remember null
+        ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .apply {
+                setAnalyzer(analysisExecutor, BarcodeAnalyzer { code -> currentOnBarcodeDetected.value(code) })
+            }
+    }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
@@ -101,11 +132,11 @@ private fun CameraContent(onCaptured: (File) -> Unit, onCancel: () -> Unit) {
                     }
                     provider.unbindAll()
                     runCatching {
+                        val useCases = listOfNotNull(preview, imageCapture, imageAnalysis).toTypedArray()
                         provider.bindToLifecycle(
                             lifecycleOwner,
                             CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageCapture,
+                            *useCases,
                         )
                     }
                 }, executor)

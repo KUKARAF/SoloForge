@@ -45,6 +45,9 @@ data class AppSettings(
     val showWeightTab: Boolean,
     val showWorkoutTab: Boolean,
     val onboardingComplete: Boolean,
+    val gristBaseUrl: String? = null,
+    val gristDocId: String? = null,
+    val gristTableId: String? = null,
 )
 
 @Singleton
@@ -70,6 +73,15 @@ class SettingsRepo @Inject constructor(
     suspend fun setShowWeightTab(value: Boolean) = update { it[KEY_TAB_WEIGHT] = value }
     suspend fun setShowWorkoutTab(value: Boolean) = update { it[KEY_TAB_WORKOUT] = value }
     suspend fun setOnboardingComplete(value: Boolean) = update { it[KEY_ONBOARDING_COMPLETE] = value }
+    suspend fun setGristBaseUrl(value: String?) = update {
+        if (value.isNullOrBlank()) it.remove(KEY_GRIST_BASE_URL) else it[KEY_GRIST_BASE_URL] = value
+    }
+    suspend fun setGristDocId(value: String?) = update {
+        if (value.isNullOrBlank()) it.remove(KEY_GRIST_DOC_ID) else it[KEY_GRIST_DOC_ID] = value
+    }
+    suspend fun setGristTableId(value: String?) = update {
+        if (value.isNullOrBlank()) it.remove(KEY_GRIST_TABLE_ID) else it[KEY_GRIST_TABLE_ID] = value
+    }
     suspend fun setWeighInEnabled(value: Boolean) = update { it[KEY_WEIGH_ENABLED] = value }
     suspend fun setWeighInTime(dayOfWeek: Int, hour: Int, minute: Int) = update {
         it[KEY_WEIGH_DAY] = dayOfWeek
@@ -136,6 +148,9 @@ class SettingsRepo @Inject constructor(
         showWeightTab = this[KEY_TAB_WEIGHT] ?: true,
         showWorkoutTab = this[KEY_TAB_WORKOUT] ?: true,
         onboardingComplete = this[KEY_ONBOARDING_COMPLETE] ?: false,
+        gristBaseUrl = this[KEY_GRIST_BASE_URL],
+        gristDocId = this[KEY_GRIST_DOC_ID],
+        gristTableId = this[KEY_GRIST_TABLE_ID],
     )
 
     private companion object {
@@ -160,5 +175,8 @@ class SettingsRepo @Inject constructor(
         val KEY_TAB_WEIGHT = booleanPreferencesKey("tab_weight_visible")
         val KEY_TAB_WORKOUT = booleanPreferencesKey("tab_workout_visible")
         val KEY_ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        val KEY_GRIST_BASE_URL = stringPreferencesKey("grist_base_url")
+        val KEY_GRIST_DOC_ID = stringPreferencesKey("grist_doc_id")
+        val KEY_GRIST_TABLE_ID = stringPreferencesKey("grist_table_id")
     }
 }

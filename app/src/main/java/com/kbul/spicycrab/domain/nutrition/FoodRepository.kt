@@ -101,22 +101,33 @@ class FoodRepository @Inject constructor(
             modelUsed = estimate.modelUsed.ifBlank { FoodAnalysisModels.DEFAULT },
             confidence = estimate.confidence,
             imagePath = savedImagePath,
+            peopleCount = estimate.peopleCount.coerceAtLeast(1),
+            consumedEpoch = if (estimate.pendingConsumption) null else now,
+            addedEpoch = now,
         )
         return entry.copy(id = dao.insert(entry))
     }
 
     suspend fun addManual(draft: FoodEntry): FoodEntry {
         val now = System.currentTimeMillis()
+        val effectiveTimestamp = draft.timestampEpoch.takeIf { it > 0 } ?: now
         return insertEntry(
             draft.copy(
-                timestampEpoch = draft.timestampEpoch.takeIf { it > 0 } ?: now,
+                timestampEpoch = effectiveTimestamp,
                 lastModifiedEpoch = now,
                 modelUsed = "manual",
                 confidence = "user",
                 imagePath = null,
+                peopleCount = draft.peopleCount.coerceAtLeast(1),
+                consumedEpoch = effectiveTimestamp,
+                addedEpoch = now,
             )
         )
     }
+
+    /** Confirms a pending (barcode-scanned but unconfirmed) entry as actually eaten. */
+    suspend fun markConsumed(entry: FoodEntry, at: Long = System.currentTimeMillis()): FoodEntry =
+        update(entry.copy(consumedEpoch = at))
 
     fun observePresets(): Flow<List<MealPreset>> = presetDao.observeAll()
 
@@ -156,6 +167,8 @@ class FoodRepository @Inject constructor(
                 modelUsed = "preset",
                 confidence = "user",
                 imagePath = null,
+                consumedEpoch = now,
+                addedEpoch = now,
             )
         )
     }
@@ -171,18 +184,21 @@ class FoodRepository @Inject constructor(
 
     suspend fun delete(entry: FoodEntry) = dao.delete(entry)
 
-    fun todayTotals(entries: List<FoodEntry>): NutritionEstimate = NutritionEstimate(
-        itemName = "today",
-        grams = entries.sumOf { it.grams },
-        kcal = entries.sumOf { it.kcal },
-        proteinG = entries.sumOf { it.proteinG },
-        carbsG = entries.sumOf { it.carbsG },
-        fatG = entries.sumOf { it.fatG },
-        fiberG = entries.sumOf { it.fiberG },
-        sodiumMg = entries.sumOf { it.sodiumMg },
-        confidence = "",
-        notes = "",
-    )
+    fun todayTotals(entries: List<FoodEntry>): NutritionEstimate {
+        val consumed = entries.filter { it.consumedEpoch != null }
+        return NutritionEstimate(
+            itemName = "today",
+            grams = consumed.sumOf { it.grams },
+            kcal = consumed.sumOf { it.shareKcal },
+            proteinG = consumed.sumOf { it.shareProteinG },
+            carbsG = consumed.sumOf { it.shareCarbsG },
+            fatG = consumed.sumOf { it.shareFatG },
+            fiberG = consumed.sumOf { it.shareFiberG },
+            sodiumMg = consumed.sumOf { it.shareSodiumMg },
+            confidence = "",
+            notes = "",
+        )
+    }
 
     fun mostRecentEpoch(entries: List<FoodEntry>): Long? = entries.firstOrNull()?.timestampEpoch
 
@@ -208,6 +224,15 @@ class FoodRepository @Inject constructor(
             )
         }
 }
+
+/** This entry's nutrition divided across everyone who shared it, e.g. a bottle of soy sauce. */
+val FoodEntry.shareDivisor: Int get() = peopleCount.coerceAtLeast(1)
+val FoodEntry.shareKcal: Double get() = kcal / shareDivisor
+val FoodEntry.shareProteinG: Double get() = proteinG / shareDivisor
+val FoodEntry.shareCarbsG: Double get() = carbsG / shareDivisor
+val FoodEntry.shareFatG: Double get() = fatG / shareDivisor
+val FoodEntry.shareFiberG: Double get() = fiberG / shareDivisor
+val FoodEntry.shareSodiumMg: Double get() = sodiumMg / shareDivisor
 
 internal fun NutritionEstimate.needsEscalation(): Boolean {
     if (confidence.equals("low", ignoreCase = true)) return true

@@ -22,4 +22,10 @@ data class FoodEntry(
     val modelUsed: String,
     val confidence: String,
     val imagePath: String?,
+    /** How many people shared this entry. Totals and the food list divide by this. */
+    val peopleCount: Int = 1,
+    /** Null until the user confirms consumption (e.g. a barcode-scanned pantry item). */
+    val consumedEpoch: Long? = null,
+    /** When this row was created; unlike [timestampEpoch] it is not user-editable. */
+    val addedEpoch: Long = 0L,
 )

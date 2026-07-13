@@ -150,5 +150,7 @@ class CalendarDaysTest {
         modelUsed = "manual",
         confidence = "user",
         imagePath = null,
+        consumedEpoch = timestamp,
+        addedEpoch = timestamp,
     )
 }

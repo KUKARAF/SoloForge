@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.ui.common.DateTimeField
+import com.kbul.spicycrab.ui.common.PeopleCountField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +43,7 @@ fun EditFoodSheet(
     onDelete: (FoodEntry) -> Unit,
     onReanalyze: (String) -> Unit,
     onSaveAsPreset: (FoodEntry) -> Unit,
+    onMarkConsumed: (FoodEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -79,6 +81,12 @@ fun EditFoodSheet(
                 onChange = { draft = draft.copy(timestampEpoch = it) },
             )
 
+            ConsumedRow(
+                consumedEpoch = draft.consumedEpoch,
+                onMarkConsumed = { onMarkConsumed(entry) },
+                onConsumedEpochChange = { draft = draft.copy(consumedEpoch = it) },
+            )
+
             if (aiEnabled) {
                 ReanalyzeRow(
                     canReanalyze = entry.imagePath != null || draft.comment.isNotBlank(),
@@ -100,6 +108,7 @@ fun EditFoodSheet(
             NumField("Fat (g)", draft.fatG) { draft = draft.copy(fatG = it) }
             NumField("Fiber (g)", draft.fiberG) { draft = draft.copy(fiberG = it) }
             NumField("Sodium (mg)", draft.sodiumMg) { draft = draft.copy(sodiumMg = it) }
+            PeopleCountField(value = draft.peopleCount, onChange = { draft = draft.copy(peopleCount = it) })
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -123,6 +132,32 @@ fun EditFoodSheet(
                 onClick = { onDelete(entry) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Delete entry", color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+@Composable
+private fun ConsumedRow(
+    consumedEpoch: Long?,
+    onMarkConsumed: () -> Unit,
+    onConsumedEpochChange: (Long) -> Unit,
+) {
+    if (consumedEpoch == null) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "Added but not yet marked as consumed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = onMarkConsumed,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Mark as consumed") }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Consumed at", style = MaterialTheme.typography.bodyMedium)
+            DateTimeField(epochMillis = consumedEpoch, onChange = onConsumedEpochChange)
         }
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kbul.spicycrab.domain.nutrition.NutritionEstimate
+import com.kbul.spicycrab.ui.common.PeopleCountField
 import java.io.File
 
 @Composable
@@ -142,6 +143,7 @@ private fun EstimateForm(
             NumberField("Fat (g)", est.fatG) { onUpdate(est.copy(fatG = it)) }
             NumberField("Fiber (g)", est.fiberG) { onUpdate(est.copy(fiberG = it)) }
             NumberField("Sodium (mg)", est.sodiumMg) { onUpdate(est.copy(sodiumMg = it)) }
+            PeopleCountField(value = est.peopleCount, onChange = { onUpdate(est.copy(peopleCount = it)) })
             if (est.notes.isNotBlank()) {
                 Text(
                     "Notes: ${est.notes}",
