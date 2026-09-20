@@ -1,6 +1,7 @@
 package com.kbul.spicycrab.ui.settings
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +58,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             snackbarHostState.showSnackbar(it)
             viewModel.clearExportMessage()
         }
+    }
+
+    // Pick up a token stored by MainActivity's OIDC deep-link handler when we resume from the browser.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshNotesToken()
+        onPauseOrDispose { }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -146,6 +154,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     placeholder = { Text("https://notes.osmosis.page") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                )
+                NotesSignInRow(
+                    baseUrl = s.notesBaseUrl,
+                    connected = hasNotesToken,
+                    onDisconnect = viewModel::clearNotesToken,
+                )
+                Text(
+                    "Paste a token manually as a fallback:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 NotesTokenField(hasNotesToken, viewModel::setNotesToken, viewModel::clearNotesToken)
             }
@@ -305,6 +323,32 @@ private fun GristKeyField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () 
                 onClick = onClear,
                 modifier = Modifier.weight(1f).height(48.dp),
             ) { Text("Clear") }
+        }
+    }
+}
+
+@Composable
+private fun NotesSignInRow(baseUrl: String?, connected: Boolean, onDisconnect: () -> Unit) {
+    val context = LocalContext.current
+    Text(
+        if (connected) "Connected to notes server." else "Not connected.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = {
+                val base = (baseUrl?.takeIf { it.isNotBlank() } ?: "https://notes.osmosis.page").trimEnd('/')
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$base/auth/login?client=app"))
+                context.startActivity(intent)
+            },
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text(if (connected) "Re-connect" else "Sign in to notes server") }
+        if (connected) {
+            OutlinedButton(
+                onClick = onDisconnect,
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text("Disconnect") }
         }
     }
 }

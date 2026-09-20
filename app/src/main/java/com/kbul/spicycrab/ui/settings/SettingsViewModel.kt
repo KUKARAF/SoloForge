@@ -78,6 +78,11 @@ class SettingsViewModel @Inject constructor(
         _hasNotesToken.value = false
     }
 
+    /** Re-reads the token after returning from the browser sign-in (deep link lands in MainActivity). */
+    fun refreshNotesToken() {
+        _hasNotesToken.value = keyStore.hasNotesToken()
+    }
+
     fun setNotesSyncEnabled(value: Boolean) = viewModelScope.launch { settings.setNotesSyncEnabled(value) }
     fun setNotesBaseUrl(value: String) = viewModelScope.launch { settings.setNotesBaseUrl(value) }
 

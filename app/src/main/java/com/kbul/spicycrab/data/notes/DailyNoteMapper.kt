@@ -84,7 +84,7 @@ object DailyNoteMapper {
      * block at the very start is treated as frontmatter; a `---` anywhere in the body is left
      * untouched. The `date` frontmatter key seeds [DailyNote.date] when present.
      */
-    fun parse(content: String, fallbackDate: LocalDate = LocalDate.EPOCH): DailyNote {
+    fun parse(content: String, fallbackDate: LocalDate = LocalDate.ofEpochDay(0)): DailyNote {
         val normalized = content.replace("\r\n", "\n")
         val fm = LinkedHashMap<String, String>()
         if (!normalized.startsWith("---\n")) {
