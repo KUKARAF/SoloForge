@@ -9,9 +9,13 @@ import com.kbul.spicycrab.data.prefs.SecureKeyStore
 import com.kbul.spicycrab.data.prefs.SettingsRepo
 import com.kbul.spicycrab.network.NotesClient
 import com.kbul.spicycrab.network.NotesConfig
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -37,6 +41,18 @@ class NotesSyncRepository @Inject constructor(
     private val workoutDao: WorkoutSessionDao,
 ) {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Fire-and-forget sync of a day's note; safe to call from any write path (no-op when off). */
+    fun scheduleSync(date: LocalDate) {
+        scope.launch { syncDay(date) }
+    }
+
+    /** Convenience for callers that have an epoch-millis timestamp instead of a [LocalDate]. */
+    fun scheduleSyncForEpoch(epochMillis: Long) {
+        scheduleSync(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate())
+    }
+
     /** True when the user has opted in and a bearer token is present. */
     suspend fun isActive(): Boolean {
         val enabled = settingsRepo.current().notesSyncEnabled
@@ -61,8 +77,11 @@ class NotesSyncRepository @Inject constructor(
         runCatching {
             val note = buildNote(date)
             val path = DailyNoteMapper.notePath(date)
-            val existingVersion = notesClient.getNote(config, path).getOrNull()?.meta?.version
-            notesClient.putNote(config, path, note.render(), existingVersion).getOrThrow()
+            // Read the current note so we overwrite only SoloForge's managed keys and preserve
+            // server-appended substance metrics (and any other app's frontmatter).
+            val existing = notesClient.getNote(config, path).getOrNull()
+            val merged = DailyNoteMapper.renderMerged(note, existing?.content)
+            notesClient.putNote(config, path, merged, existing?.meta?.version).getOrThrow()
             Unit
         }
     }

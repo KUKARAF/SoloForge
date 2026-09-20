@@ -25,6 +25,7 @@ data class WorkoutUiState(
     val history: List<WorkoutSession> = emptyList(),
     val selectedMode: WorkoutMode = WorkoutMode.SIMPLE,
     val intervalMinutes: Double = 2.0,
+    val stretchedToday: Boolean = false,
 )
 
 @HiltViewModel
@@ -52,9 +53,10 @@ class WorkoutViewModel @Inject constructor(
         WorkoutUiState(
             active = active,
             nowMs = now,
-            history = all.filter { it.endEpoch != null },
+            history = all.filter { it.endEpoch != null && !it.isStretch },
             selectedMode = mode,
             intervalMinutes = interval,
+            stretchedToday = all.any { it.isStretch && isSameDay(it.startEpoch, now) },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WorkoutUiState())
 
@@ -95,4 +97,14 @@ class WorkoutViewModel @Inject constructor(
             _editing.value = null
         }
     }
+
+    fun logStretch() {
+        viewModelScope.launch { repository.logStretch() }
+    }
+}
+
+private fun isSameDay(epochA: Long, epochB: Long): Boolean {
+    val zone = java.time.ZoneId.systemDefault()
+    return java.time.Instant.ofEpochMilli(epochA).atZone(zone).toLocalDate() ==
+        java.time.Instant.ofEpochMilli(epochB).atZone(zone).toLocalDate()
 }

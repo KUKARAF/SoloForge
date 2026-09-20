@@ -28,4 +28,8 @@ data class FoodEntry(
     val consumedEpoch: Long? = null,
     /** When this row was created; unlike [timestampEpoch] it is not user-editable. */
     val addedEpoch: Long = 0L,
+    /** Contains no animal products. Invariant: if true, [isVegetarian] must also be true. */
+    val isVegan: Boolean = false,
+    /** Contains no meat/fish (dairy/eggs allowed). Implied true whenever [isVegan] is true. */
+    val isVegetarian: Boolean = false,
 )

@@ -5,20 +5,27 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.kbul.spicycrab.data.db.dao.WorkoutSessionDao
 import com.kbul.spicycrab.data.prefs.SecureKeyStore
+import com.kbul.spicycrab.notifications.WorkoutNotificationService
 import com.kbul.spicycrab.ui.nav.AppNav
 import com.kbul.spicycrab.ui.theme.SpicyCrabTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var secureKeyStore: SecureKeyStore
+    @Inject lateinit var workoutDao: WorkoutSessionDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleAuthDeepLink(intent)
+        reestablishWorkoutNotification()
         enableEdgeToEdge()
         setContent {
             SpicyCrabTheme {
@@ -44,6 +51,21 @@ class MainActivity : ComponentActivity() {
         if (data.scheme != AUTH_SCHEME || data.host != AUTH_HOST) return
         val token = data.getQueryParameter("token")?.takeIf { it.isNotBlank() } ?: return
         secureKeyStore.setNotesToken(token)
+    }
+
+    /**
+     * If a workout is still marked active in Room (e.g. the process was reaped mid-session),
+     * restart the foreground service so its ongoing notification reappears and can be stopped.
+     */
+    private fun reestablishWorkoutNotification() {
+        lifecycleScope.launch {
+            if (workoutDao.getActive() != null) {
+                ContextCompat.startForegroundService(
+                    this@MainActivity,
+                    WorkoutNotificationService.reconcileIntent(this@MainActivity),
+                )
+            }
+        }
     }
 
     private companion object {

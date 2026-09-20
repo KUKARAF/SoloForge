@@ -46,6 +46,10 @@ data class NutritionEstimateDto(
     @SerialName("fat_g") val fatG: Double,
     @SerialName("fiber_g") val fiberG: Double = 0.0,
     @SerialName("sodium_mg") val sodiumMg: Double = 0.0,
+    val vegan: Boolean = false,
+    val vegetarian: Boolean = false,
+    @SerialName("alcohol_g") val alcoholG: Double = 0.0,
+    @SerialName("caffeine_mg") val caffeineMg: Double = 0.0,
     val confidence: String = "medium",
     val notes: String = "",
 )

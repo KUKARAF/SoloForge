@@ -9,6 +9,7 @@ import com.kbul.spicycrab.domain.barcode.ProductLookupRepository
 import com.kbul.spicycrab.domain.barcode.toNutritionEstimate
 import com.kbul.spicycrab.domain.nutrition.FoodRepository
 import com.kbul.spicycrab.domain.nutrition.NutritionEstimate
+import com.kbul.spicycrab.domain.nutrition.SubstanceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,8 +46,11 @@ data class EditingState(
 class FoodViewModel @Inject constructor(
     private val repository: FoodRepository,
     private val productLookup: ProductLookupRepository,
+    private val substances: SubstanceRepository,
     settings: SettingsRepo,
 ) : ViewModel() {
+
+    val substanceKeys: List<String> = substances.builtInKeys
 
     val aiEnabled: StateFlow<Boolean> = settings.settings.map { it.aiFeaturesEnabled }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
@@ -67,6 +71,9 @@ class FoodViewModel @Inject constructor(
 
     private val _manualOpen = MutableStateFlow(false)
     val manualOpen: StateFlow<Boolean> = _manualOpen.asStateFlow()
+
+    private val _substanceOpen = MutableStateFlow(false)
+    val substanceOpen: StateFlow<Boolean> = _substanceOpen.asStateFlow()
 
     val entries: StateFlow<List<FoodEntry>> = repository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -210,6 +217,16 @@ class FoodViewModel @Inject constructor(
         }
     }
 
+    fun openSubstance() { _substanceOpen.value = true }
+    fun dismissSubstance() { _substanceOpen.value = false }
+    fun saveSubstance(key: String, amountInt: Int, timestampEpoch: Long) {
+        if (key.isBlank() || amountInt <= 0) return
+        viewModelScope.launch {
+            runCatching { substances.add(key, amountInt, timestampEpoch) }
+                .onSuccess { _substanceOpen.value = false }
+        }
+    }
+
     fun reanalyzeEdit(updatedComment: String) {
         val cur = _editing.value ?: return
         val path = cur.entry.imagePath
@@ -233,6 +250,8 @@ class FoodViewModel @Inject constructor(
                             fatG = est.fatG,
                             fiberG = est.fiberG,
                             sodiumMg = est.sodiumMg,
+                            isVegan = est.isVegan,
+                            isVegetarian = est.isVegetarian || est.isVegan,
                             confidence = est.confidence,
                             comment = updatedComment,
                             modelUsed = est.modelUsed,

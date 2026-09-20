@@ -97,11 +97,15 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
         if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
     }
 
-    /** Appends a structured metric into the day's frontmatter server-side. */
+    /**
+     * Appends a structured integer metric into the day's frontmatter server-side. This endpoint is
+     * append-only and CRDT-safe: it never clobbers the note, and a second POST for the same key/day
+     * turns the scalar into an inline list. Callers must not re-POST an already-synced sample.
+     */
     suspend fun postStat(
         config: NotesConfig,
         key: String,
-        value: Double,
+        value: Int,
         at: String? = null,
         date: String? = null,
     ): Result<Unit> = runCatching {
@@ -109,6 +113,24 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
             bearer(config)
             contentType(ContentType.Application.Json)
             setBody(StatRequest(key, value, at, date))
+        }
+        val raw = resp.bodyAsText()
+        if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
+    }
+
+    /** Registers a metric (idempotent) so `GET /api/stats` returns its series. */
+    suspend fun putStatRegistry(
+        config: NotesConfig,
+        metric: String,
+        unit: String,
+        label: String,
+        chart: String,
+        agg: String,
+    ): Result<Unit> = runCatching {
+        val resp: HttpResponse = client.put(statsRegistryUrl(config, metric)) {
+            bearer(config)
+            contentType(ContentType.Application.Json)
+            setBody(StatRegistryRequest(unit, label, chart, agg))
         }
         val raw = resp.bodyAsText()
         if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
@@ -123,4 +145,6 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
     private fun noteUrl(config: NotesConfig, path: String): String =
         "${base(config)}/api/notes/${path.trim('/').encodeURLPath()}"
     private fun statsUrl(config: NotesConfig): String = "${base(config)}/api/stats"
+    private fun statsRegistryUrl(config: NotesConfig, metric: String): String =
+        "${base(config)}/api/stats/registry/${metric.trim('/').encodeURLPath()}"
 }

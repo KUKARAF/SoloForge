@@ -34,8 +34,33 @@ data class DailyNote(
 
 object DailyNoteMapper {
 
+    /**
+     * Frontmatter keys SoloForge owns and overwrites on every whole-note PUT. Any key NOT in this
+     * set (e.g. substance metrics appended by the server's /api/stats, or keys another app wrote)
+     * is preserved by [renderMerged].
+     */
+    val MANAGED_KEYS: Set<String> = setOf(
+        "date", "kcal", "protein", "carbs", "fat", "fiber", "food_entries",
+        "vegan", "vegetarian", "salt_g", "fasted_hours", "weight_kg",
+        "workout_minutes", "workout", "stretches", "last_modified",
+    )
+
     /** `diary/YYYY-MM-DD` id used to address a day's note on the server. */
     fun notePath(date: LocalDate): String = "diary/$date"
+
+    /**
+     * Renders [managed] for a whole-note PUT while preserving foreign frontmatter. Only
+     * [MANAGED_KEYS] are overwritten; every other key from [existingContent] (substance lines the
+     * server appended via /api/stats, or another app's keys) survives untouched. The body is
+     * SoloForge-owned (the journal), so it is taken from [managed].
+     */
+    fun renderMerged(managed: DailyNote, existingContent: String?): String {
+        val existing = existingContent?.let { parse(it).frontmatter } ?: LinkedHashMap()
+        val merged = LinkedHashMap<String, String>()
+        for ((k, v) in existing) if (k !in MANAGED_KEYS) merged[k] = v
+        for ((k, v) in managed.frontmatter) merged[k] = v
+        return managed.copy(frontmatter = merged).render()
+    }
 
     /**
      * Builds the daily note from a day's Room rows. Metrics are summed across the day; where an
@@ -59,15 +84,25 @@ object DailyNoteMapper {
             fm["fat"] = num(foods.sumOf { it.fatG / it.peopleCount })
             fm["fiber"] = num(foods.sumOf { it.fiberG / it.peopleCount })
             fm["food_entries"] = foods.size.toString()
+            // Whole-day diet flags: true only if every entry qualifies (one non-veg item flips it).
+            fm["vegan"] = bool(foods.all { it.isVegan })
+            fm["vegetarian"] = bool(foods.all { it.isVegetarian })
+        }
+        // salt_g from summed sodium (sodium→salt factor 2.5), only when any entry carries sodium.
+        if (foods.any { it.sodiumMg > 0.0 }) {
+            fm["salt_g"] = oneDecimal(foods.sumOf { it.sodiumMg } * 2.5 / 1000.0)
         }
         fasts.filter { it.completed }.maxByOrNull { it.endEpoch ?: 0L }?.let { fast ->
             val end = fast.endEpoch ?: return@let
             fm["fasted_hours"] = num((end - fast.startEpoch) / 3_600_000.0)
         }
         weights.maxByOrNull { it.timestampEpoch }?.let { fm["weight_kg"] = num(it.weightKg) }
-        workouts.filter { it.endEpoch != null }.takeIf { it.isNotEmpty() }?.let { done ->
+        workouts.filter { it.endEpoch != null && !it.isStretch }.takeIf { it.isNotEmpty() }?.let { done ->
             fm["workout_minutes"] = num(done.sumOf { it.totalSeconds } / 60.0)
         }
+        // Per-day booleans, always emitted: a real (non-stretch) session vs. a stretch marker.
+        fm["workout"] = bool(workouts.any { !it.isStretch })
+        fm["stretches"] = bool(workouts.any { it.isStretch })
 
         val lastModified = buildList {
             addAll(foods.map { it.lastModifiedEpoch })
@@ -109,6 +144,11 @@ object DailyNoteMapper {
         val date = fm["date"]?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: fallbackDate
         return DailyNote(date, fm, body)
     }
+
+    private fun bool(value: Boolean): String = if (value) "true" else "false"
+
+    /** Rounds to one decimal place, e.g. `6.25` → `6.3`, `6.0` → `6`. */
+    private fun oneDecimal(value: Double): String = num(Math.round(value * 10.0) / 10.0)
 
     /** Compact number: drops the trailing `.0` for whole values so `60.0` renders as `60`. */
     private fun num(value: Double): String {

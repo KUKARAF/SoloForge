@@ -34,7 +34,16 @@ data class PutNoteRequest(
 @Serializable
 data class StatRequest(
     val key: String,
-    val value: Double,
+    // Integer-only per the server contract; a second POST to the same key/day becomes an inline list.
+    val value: Int,
     val at: String? = null,
     val date: String? = null,
+)
+
+@Serializable
+data class StatRegistryRequest(
+    val unit: String,
+    val label: String,
+    val chart: String,
+    val agg: String,
 )

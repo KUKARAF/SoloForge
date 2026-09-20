@@ -87,6 +87,22 @@ fun ManualFoodSheet(
             NumField("Fat (g)", draft.fatG) { draft = draft.copy(fatG = it) }
             NumField("Fiber (g)", draft.fiberG) { draft = draft.copy(fiberG = it) }
             NumField("Sodium (mg)", draft.sodiumMg) { draft = draft.copy(sodiumMg = it) }
+            VegToggleRow(
+                label = "Vegan",
+                checked = draft.isVegan,
+                onCheckedChange = { on ->
+                    // Vegan implies vegetarian; clearing vegan leaves vegetarian as-is.
+                    draft = draft.copy(isVegan = on, isVegetarian = if (on) true else draft.isVegetarian)
+                },
+            )
+            VegToggleRow(
+                label = "Vegetarian",
+                checked = draft.isVegetarian,
+                onCheckedChange = { on ->
+                    // Can't be non-vegetarian while vegan; unchecking vegetarian also clears vegan.
+                    draft = draft.copy(isVegetarian = on, isVegan = if (on) draft.isVegan else false)
+                },
+            )
             PeopleCountField(value = draft.peopleCount, onChange = { draft = draft.copy(peopleCount = it) })
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,6 +155,18 @@ private fun scaleEntry(entry: FoodEntry, newGrams: Double): FoodEntry {
         fiberG = entry.fiberG * r,
         sodiumMg = entry.sodiumMg * r,
     )
+}
+
+@Composable
+private fun VegToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 @Composable

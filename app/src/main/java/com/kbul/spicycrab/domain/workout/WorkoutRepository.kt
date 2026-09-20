@@ -4,10 +4,13 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import com.kbul.spicycrab.data.db.dao.WorkoutSessionDao
 import com.kbul.spicycrab.data.db.entities.WorkoutSession
+import com.kbul.spicycrab.data.notes.NotesSyncRepository
 import com.kbul.spicycrab.notifications.WorkoutNotificationService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +18,7 @@ import javax.inject.Singleton
 class WorkoutRepository @Inject constructor(
     private val dao: WorkoutSessionDao,
     private val stateHolder: WorkoutStateHolder,
+    private val notesSync: NotesSyncRepository,
     @ApplicationContext private val context: Context,
 ) {
 
@@ -62,7 +66,38 @@ class WorkoutRepository @Inject constructor(
             context,
             WorkoutNotificationService.startIntent(context, id, mode, intervalSeconds),
         )
+        notesSync.scheduleSyncForEpoch(now)
         return saved
+    }
+
+    /**
+     * Records that the user stretched today. Idempotent: a second tap on the same day keeps the
+     * day marked without adding a duplicate. Stored as a completed [WorkoutSession] with
+     * [WorkoutSession.isStretch] = true so it never appears as an active or "real" workout.
+     */
+    suspend fun logStretch(): Boolean {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val start = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        val end = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        if (dao.countStretchesBetween(start, end) > 0) return false
+        val now = System.currentTimeMillis()
+        dao.insert(
+            WorkoutSession(
+                modeName = WorkoutMode.SIMPLE.name,
+                startEpoch = now,
+                endEpoch = now,
+                totalSeconds = 0L,
+                intervalSeconds = 0,
+                exerciseSeconds = 0L,
+                restSeconds = 0L,
+                notes = "Stretched",
+                lastModifiedEpoch = now,
+                isStretch = true,
+            )
+        )
+        notesSync.scheduleSyncForEpoch(now)
+        return true
     }
 
     fun togglePhase() {
@@ -83,7 +118,11 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun update(updated: WorkoutSession) {
         dao.update(updated.copy(lastModifiedEpoch = System.currentTimeMillis()))
+        notesSync.scheduleSyncForEpoch(updated.startEpoch)
     }
 
-    suspend fun delete(session: WorkoutSession) = dao.delete(session)
+    suspend fun delete(session: WorkoutSession) {
+        dao.delete(session)
+        notesSync.scheduleSyncForEpoch(session.startEpoch)
+    }
 }

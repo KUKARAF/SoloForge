@@ -86,9 +86,19 @@ class NotesClientTest {
 
     @Test
     fun postStatHitsStatsEndpoint() = runBlocking {
-        val result = clientReturning("""{"ok":true}""").postStat(config, "protein", 60.0, "0720", "2026-09-20")
+        val result = clientReturning("""{"ok":true}""").postStat(config, "caffeine", 40, "0720", "2026-09-20")
         assertTrue(result.isSuccess)
+        assertEquals(HttpMethod.Post, lastMethod)
         assertEquals("https://notes.osmosis.page/api/stats", lastUrl)
+    }
+
+    @Test
+    fun putStatRegistryHitsRegistryEndpoint() = runBlocking {
+        val result = clientReturning("""{"ok":true}""")
+            .putStatRegistry(config, "caffeine", "mg", "caffeine", "line", "sum")
+        assertTrue(result.isSuccess)
+        assertEquals(HttpMethod.Put, lastMethod)
+        assertEquals("https://notes.osmosis.page/api/stats/registry/caffeine", lastUrl)
     }
 
     @Test
