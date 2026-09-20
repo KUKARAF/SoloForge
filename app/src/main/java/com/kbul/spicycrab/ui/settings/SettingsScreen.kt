@@ -46,6 +46,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
     val hasGristKey by viewModel.hasGristKey.collectAsStateWithLifecycle()
+    val hasNotesToken by viewModel.hasNotesToken.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val s = settings ?: return
@@ -126,6 +127,28 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 singleLine = true,
             )
             GristKeyField(hasGristKey, viewModel::setGristApiKey, viewModel::clearGristApiKey)
+        }
+
+        SectionCard("Notes server sync") {
+            Text(
+                "Optional. Mirrors each day's records to a rust_note server at notes.osmosis.page " +
+                    "as a daily note (diary/YYYY-MM-DD) with YAML frontmatter, on top of local " +
+                    "storage. Room stays the source of truth. Paste a device bearer token to enable.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SwitchRow("Sync to notes server", s.notesSyncEnabled, viewModel::setNotesSyncEnabled)
+            if (s.notesSyncEnabled) {
+                OutlinedTextField(
+                    value = s.notesBaseUrl ?: "",
+                    onValueChange = viewModel::setNotesBaseUrl,
+                    label = { Text("Notes server base URL") },
+                    placeholder = { Text("https://notes.osmosis.page") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                NotesTokenField(hasNotesToken, viewModel::setNotesToken, viewModel::clearNotesToken)
+            }
         }
 
         SectionCard("Daily nutrition goals") {
@@ -268,6 +291,35 @@ private fun GristKeyField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () 
         value = input,
         onValueChange = { input = it },
         label = { Text("Grist API key") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { onSet(input); input = "" },
+            enabled = input.isNotBlank(),
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text(if (hasKey) "Replace" else "Save") }
+        if (hasKey) {
+            OutlinedButton(
+                onClick = onClear,
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text("Clear") }
+        }
+    }
+}
+
+@Composable
+private fun NotesTokenField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () -> Unit) {
+    var input by remember { mutableStateOf("") }
+    Text(
+        if (hasKey) "A notes bearer token is set." else "No notes token set.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    OutlinedTextField(
+        value = input,
+        onValueChange = { input = it },
+        label = { Text("Notes bearer token") },
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth(),
     )

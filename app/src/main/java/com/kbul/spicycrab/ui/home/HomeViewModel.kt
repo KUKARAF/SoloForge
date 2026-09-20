@@ -3,6 +3,7 @@ package com.kbul.spicycrab.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kbul.spicycrab.data.db.dao.JournalEntryDao
+import com.kbul.spicycrab.data.notes.NotesSyncRepository
 import com.kbul.spicycrab.data.db.entities.FastSession
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.JournalEntry
@@ -82,6 +83,7 @@ class HomeViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val journalDao: JournalEntryDao,
     private val settings: SettingsRepo,
+    private val notesSync: NotesSyncRepository,
 ) : ViewModel() {
 
     private val ticker = flow {
@@ -224,6 +226,8 @@ class HomeViewModel @Inject constructor(
             } else {
                 journalDao.upsert(JournalEntry(date.toEpochDay(), trimmed, System.currentTimeMillis()))
             }
+            // Write-through: mirror the day to the notes server. No-op when sync is off; never throws.
+            notesSync.syncDay(date)
         }
     }
 }

@@ -65,6 +65,22 @@ class SettingsViewModel @Inject constructor(
     fun setGristDocId(value: String) = viewModelScope.launch { settings.setGristDocId(value) }
     fun setGristTableId(value: String) = viewModelScope.launch { settings.setGristTableId(value) }
 
+    private val _hasNotesToken = MutableStateFlow(keyStore.hasNotesToken())
+    val hasNotesToken: StateFlow<Boolean> = _hasNotesToken.asStateFlow()
+
+    fun setNotesToken(value: String) {
+        keyStore.setNotesToken(value.takeIf { it.isNotBlank() })
+        _hasNotesToken.value = keyStore.hasNotesToken()
+    }
+
+    fun clearNotesToken() {
+        keyStore.setNotesToken(null)
+        _hasNotesToken.value = false
+    }
+
+    fun setNotesSyncEnabled(value: Boolean) = viewModelScope.launch { settings.setNotesSyncEnabled(value) }
+    fun setNotesBaseUrl(value: String) = viewModelScope.launch { settings.setNotesBaseUrl(value) }
+
     fun setExportFolder(uri: String?) = viewModelScope.launch { settings.setExportFolderUri(uri) }
 
     fun setSavePhotoLocally(value: Boolean) = viewModelScope.launch { settings.setSavePhotoLocally(value) }

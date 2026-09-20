@@ -45,8 +45,19 @@ class SecureKeyStore @Inject constructor(
 
     fun hasGristApiKey(): Boolean = !getGristApiKey().isNullOrBlank()
 
+    fun getNotesToken(): String? = prefs.getString(KEY_NOTES, null)
+
+    fun setNotesToken(value: String?) {
+        prefs.edit().apply {
+            if (value.isNullOrBlank()) remove(KEY_NOTES) else putString(KEY_NOTES, value)
+        }.apply()
+    }
+
+    fun hasNotesToken(): Boolean = !getNotesToken().isNullOrBlank()
+
     private companion object {
         const val KEY_OPENROUTER = "openrouter_api_key"
         const val KEY_GRIST = "grist_api_key"
+        const val KEY_NOTES = "notes_bearer_token"
     }
 }
