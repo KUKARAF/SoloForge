@@ -14,7 +14,7 @@ class NutritionEstimateDtoTest {
         val body = """
             {"item_name":"Weizen beer","estimated_grams":500,"calories":210,
              "protein_g":2.0,"carbs_g":18.0,"fat_g":0.0,"fiber_g":0.0,"sodium_mg":25,
-             "vegan":true,"vegetarian":true,"alcohol_g":15,"caffeine_mg":0,
+             "vegan":true,"vegetarian":true,"alcohol_g":15,"caffeine_mg":0,"sugar_g":3,
              "confidence":"medium","notes":"~500ml"}
         """.trimIndent()
         val dto = json.decodeFromString(NutritionEstimateDto.serializer(), body)
@@ -22,6 +22,7 @@ class NutritionEstimateDtoTest {
         assertTrue(dto.vegetarian)
         assertEquals(15.0, dto.alcoholG, 0.0)
         assertEquals(0.0, dto.caffeineMg, 0.0)
+        assertEquals(3.0, dto.sugarG, 0.0)
     }
 
     @Test
@@ -34,6 +35,7 @@ class NutritionEstimateDtoTest {
         val dto = json.decodeFromString(NutritionEstimateDto.serializer(), body)
         assertEquals(0.0, dto.alcoholG, 0.0)
         assertEquals(0.0, dto.caffeineMg, 0.0)
+        assertEquals(0.0, dto.sugarG, 0.0)
         assertEquals(false, dto.vegan)
     }
 }

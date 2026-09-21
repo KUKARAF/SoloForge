@@ -50,6 +50,7 @@ data class NutritionEstimateDto(
     val vegetarian: Boolean = false,
     @SerialName("alcohol_g") val alcoholG: Double = 0.0,
     @SerialName("caffeine_mg") val caffeineMg: Double = 0.0,
+    @SerialName("sugar_g") val sugarG: Double = 0.0,
     val confidence: String = "medium",
     val notes: String = "",
 )

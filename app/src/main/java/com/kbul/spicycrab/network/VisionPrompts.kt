@@ -19,6 +19,7 @@ object VisionPrompts {
           "vegetarian": boolean,
           "alcohol_g": number,
           "caffeine_mg": number,
+          "sugar_g": number,
           "confidence": "low" | "medium" | "high",
           "notes": string
         }
@@ -35,7 +36,9 @@ object VisionPrompts {
           are present, prefer false for the stricter classification and mention it in notes.
         - alcohol_g is grams of pure ethanol when the item is alcoholic (e.g. a ~500 ml weizen beer
           ≈ 15 g), else 0. caffeine_mg is milligrams of caffeine (coffee, tea, cola, energy drink,
-          dark chocolate), else 0. Give whole-number best estimates; 0 when none is present.
+          dark chocolate), else 0. sugar_g is grams of total sugars (a subset of carbs, from fruit,
+          added sugar, sweetened drinks, desserts), else 0. Give whole-number best estimates; 0 when
+          none is present.
         - If multiple items are visible, sum them and describe the meal in item_name.
         - Trust the user comment over visual ambiguity.
         - Use "low" confidence when the photo is unclear or portion size is hard to judge.

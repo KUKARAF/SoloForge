@@ -19,8 +19,8 @@ import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Registry defaults for the built-in substances; custom keys fall back to a generic bar/sum. */
-private data class RegistrySpec(val unit: String, val chart: String, val agg: String)
+/** Registry definition for a stats metric; custom substance keys fall back to a generic bar/sum. */
+private data class RegistrySpec(val unit: String, val label: String, val chart: String, val agg: String)
 
 /**
  * Local-first store of timed substance samples. Rows are the source of truth in Room; each is
@@ -41,8 +41,8 @@ class SubstanceRepository @Inject constructor(
 
     fun observeAll(): Flow<List<SubstanceEntry>> = dao.observeAll()
 
-    /** Known metrics with human units used both by the quick-add UI and the stats registry. */
-    val builtInKeys: List<String> = BUILT_IN.keys.toList()
+    /** Substance metrics offered as quick-add chips (booleans below are not user-logged). */
+    val builtInKeys: List<String> = listOf("alcohol", "caffeine", "nicotine", "sugar")
 
     suspend fun add(key: String, amountInt: Int, timestampEpoch: Long): SubstanceEntry {
         val now = System.currentTimeMillis()
@@ -72,6 +72,10 @@ class SubstanceRepository @Inject constructor(
 
     private suspend fun flushInternal() = flushMutex.withLock {
         val config = config() ?: return
+        // Register the boolean daily metrics so the stats board can read them, even on a day with
+        // no substance samples to post. Idempotent and once-per-session.
+        ensureRegistered(config, "vegan")
+        ensureRegistered(config, "vegetarian")
         val pending = dao.unsynced()
         if (pending.isEmpty()) return
         pending.map { it.key }.distinct().forEach { ensureRegistered(config, it) }
@@ -87,9 +91,9 @@ class SubstanceRepository @Inject constructor(
 
     private suspend fun ensureRegistered(config: NotesConfig, key: String) {
         if (!registeredThisSession.add(key)) return
-        val spec = BUILT_IN[key] ?: RegistrySpec(unit = "", chart = "bar", agg = "sum")
+        val spec = REGISTRY[key] ?: RegistrySpec(unit = "", label = key, chart = "bar", agg = "sum")
         // Idempotent on the server; failure is non-fatal (only affects GET series, not posting).
-        notesClient.putStatRegistry(config, key, spec.unit, key, spec.chart, spec.agg)
+        notesClient.putStatRegistry(config, key, spec.unit, spec.label, spec.chart, spec.agg)
     }
 
     private suspend fun config(): NotesConfig? {
@@ -102,10 +106,14 @@ class SubstanceRepository @Inject constructor(
 
     private companion object {
         const val DEFAULT_BASE_URL = "https://notes.osmosis.page"
-        val BUILT_IN: Map<String, RegistrySpec> = linkedMapOf(
-            "alcohol" to RegistrySpec("g", "bar", "sum"),
-            "caffeine" to RegistrySpec("mg", "line", "sum"),
-            "nicotine" to RegistrySpec("mg", "bar", "sum"),
+        // Shared conventions — must match the journal app and the rust_note stats view exactly.
+        val REGISTRY: Map<String, RegistrySpec> = linkedMapOf(
+            "alcohol" to RegistrySpec("g", "Alcohol", "bar", "sum"),
+            "caffeine" to RegistrySpec("mg", "Caffeine", "line", "sum"),
+            "nicotine" to RegistrySpec("mg", "Nicotine", "bar", "sum"),
+            "sugar" to RegistrySpec("g", "Sugar", "bar", "sum"),
+            "vegan" to RegistrySpec("", "Vegan", "boolean", "last"),
+            "vegetarian" to RegistrySpec("", "Vegetarian", "boolean", "last"),
         )
     }
 }

@@ -115,6 +115,7 @@ class FoodRepository @Inject constructor(
         // Analyzed drinks/foods may carry substances; log them at the food's time (integer amounts).
         if (estimate.alcoholG >= 0.5) substances.add("alcohol", Math.round(estimate.alcoholG).toInt(), saved.timestampEpoch)
         if (estimate.caffeineMg >= 0.5) substances.add("caffeine", Math.round(estimate.caffeineMg).toInt(), saved.timestampEpoch)
+        if (estimate.sugarG >= 0.5) substances.add("sugar", Math.round(estimate.sugarG).toInt(), saved.timestampEpoch)
         return saved
     }
 
@@ -239,6 +240,7 @@ class FoodRepository @Inject constructor(
                 isVegetarian = dto.vegetarian || dto.vegan,
                 alcoholG = dto.alcoholG,
                 caffeineMg = dto.caffeineMg,
+                sugarG = dto.sugarG,
                 confidence = dto.confidence,
                 notes = dto.notes,
                 modelUsed = model,

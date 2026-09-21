@@ -13,6 +13,7 @@ data class NutritionEstimate(
     val isVegetarian: Boolean = false,
     val alcoholG: Double = 0.0,
     val caffeineMg: Double = 0.0,
+    val sugarG: Double = 0.0,
     val confidence: String,
     val notes: String,
     val modelUsed: String = "",
