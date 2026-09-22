@@ -21,8 +21,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
-
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Decode keystore and write signing config
@@ -60,7 +58,8 @@ jobs:
       - name: Verify signature
         run: |
           set -euo pipefail
-          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort -V | tail -n1)
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner | sort -V | tail -n1)
           "$APKSIGNER" verify --print-certs "${{ steps.apk.outputs.path }}"
 
       - name: Publish GitHub Release
