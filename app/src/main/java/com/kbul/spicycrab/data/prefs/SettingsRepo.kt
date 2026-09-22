@@ -48,6 +48,8 @@ data class AppSettings(
     val gristBaseUrl: String? = null,
     val gristDocId: String? = null,
     val gristTableId: String? = null,
+    val notesSyncEnabled: Boolean = false,
+    val notesBaseUrl: String? = null,
 )
 
 @Singleton
@@ -81,6 +83,10 @@ class SettingsRepo @Inject constructor(
     }
     suspend fun setGristTableId(value: String?) = update {
         if (value.isNullOrBlank()) it.remove(KEY_GRIST_TABLE_ID) else it[KEY_GRIST_TABLE_ID] = value
+    }
+    suspend fun setNotesSyncEnabled(value: Boolean) = update { it[KEY_NOTES_SYNC] = value }
+    suspend fun setNotesBaseUrl(value: String?) = update {
+        if (value.isNullOrBlank()) it.remove(KEY_NOTES_BASE_URL) else it[KEY_NOTES_BASE_URL] = value
     }
     suspend fun setWeighInEnabled(value: Boolean) = update { it[KEY_WEIGH_ENABLED] = value }
     suspend fun setWeighInTime(dayOfWeek: Int, hour: Int, minute: Int) = update {
@@ -118,6 +124,7 @@ class SettingsRepo @Inject constructor(
         it[KEY_TAB_WEIGHT] = s.showWeightTab
         it[KEY_TAB_WORKOUT] = s.showWorkoutTab
         it[KEY_ONBOARDING_COMPLETE] = s.onboardingComplete
+        it[KEY_NOTES_SYNC] = s.notesSyncEnabled
     }
 
     private suspend fun update(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
@@ -151,6 +158,8 @@ class SettingsRepo @Inject constructor(
         gristBaseUrl = this[KEY_GRIST_BASE_URL],
         gristDocId = this[KEY_GRIST_DOC_ID],
         gristTableId = this[KEY_GRIST_TABLE_ID],
+        notesSyncEnabled = this[KEY_NOTES_SYNC] ?: false,
+        notesBaseUrl = this[KEY_NOTES_BASE_URL],
     )
 
     private companion object {
@@ -178,5 +187,7 @@ class SettingsRepo @Inject constructor(
         val KEY_GRIST_BASE_URL = stringPreferencesKey("grist_base_url")
         val KEY_GRIST_DOC_ID = stringPreferencesKey("grist_doc_id")
         val KEY_GRIST_TABLE_ID = stringPreferencesKey("grist_table_id")
+        val KEY_NOTES_SYNC = booleanPreferencesKey("notes_sync_enabled")
+        val KEY_NOTES_BASE_URL = stringPreferencesKey("notes_base_url")
     }
 }

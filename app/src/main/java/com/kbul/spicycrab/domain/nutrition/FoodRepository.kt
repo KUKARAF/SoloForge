@@ -5,6 +5,7 @@ import com.kbul.spicycrab.data.db.dao.FoodEntryDao
 import com.kbul.spicycrab.data.db.dao.MealPresetDao
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.MealPreset
+import com.kbul.spicycrab.data.notes.NotesSyncRepository
 import com.kbul.spicycrab.data.prefs.SecureKeyStore
 import com.kbul.spicycrab.data.prefs.SettingsRepo
 import com.kbul.spicycrab.network.OpenRouterClient
@@ -27,6 +28,8 @@ class FoodRepository @Inject constructor(
     private val client: OpenRouterClient,
     private val keyStore: SecureKeyStore,
     private val settings: SettingsRepo,
+    private val notesSync: NotesSyncRepository,
+    private val substances: SubstanceRepository,
     @ApplicationContext private val context: Context,
 ) {
 
@@ -104,8 +107,16 @@ class FoodRepository @Inject constructor(
             peopleCount = estimate.peopleCount.coerceAtLeast(1),
             consumedEpoch = if (estimate.pendingConsumption) null else now,
             addedEpoch = now,
-        )
-        return entry.copy(id = dao.insert(entry))
+            isVegan = estimate.isVegan,
+            isVegetarian = estimate.isVegetarian,
+        ).normalizedVeg()
+        val saved = entry.copy(id = dao.insert(entry))
+        notesSync.scheduleSyncForEpoch(saved.timestampEpoch)
+        // Analyzed drinks/foods may carry substances; log them at the food's time (integer amounts).
+        if (estimate.alcoholG >= 0.5) substances.add("alcohol", Math.round(estimate.alcoholG).toInt(), saved.timestampEpoch)
+        if (estimate.caffeineMg >= 0.5) substances.add("caffeine", Math.round(estimate.caffeineMg).toInt(), saved.timestampEpoch)
+        if (estimate.sugarG >= 0.5) substances.add("sugar", Math.round(estimate.sugarG).toInt(), saved.timestampEpoch)
+        return saved
     }
 
     suspend fun addManual(draft: FoodEntry): FoodEntry {
@@ -121,7 +132,7 @@ class FoodRepository @Inject constructor(
                 peopleCount = draft.peopleCount.coerceAtLeast(1),
                 consumedEpoch = effectiveTimestamp,
                 addedEpoch = now,
-            )
+            ).normalizedVeg()
         )
     }
 
@@ -173,16 +184,23 @@ class FoodRepository @Inject constructor(
         )
     }
 
-    private suspend fun insertEntry(entry: FoodEntry): FoodEntry =
-        entry.copy(id = dao.insert(entry))
+    private suspend fun insertEntry(entry: FoodEntry): FoodEntry {
+        val saved = entry.copy(id = dao.insert(entry))
+        notesSync.scheduleSyncForEpoch(saved.timestampEpoch)
+        return saved
+    }
 
     suspend fun update(updated: FoodEntry): FoodEntry {
-        val bumped = updated.copy(lastModifiedEpoch = System.currentTimeMillis())
+        val bumped = updated.copy(lastModifiedEpoch = System.currentTimeMillis()).normalizedVeg()
         dao.update(bumped)
+        notesSync.scheduleSyncForEpoch(bumped.timestampEpoch)
         return bumped
     }
 
-    suspend fun delete(entry: FoodEntry) = dao.delete(entry)
+    suspend fun delete(entry: FoodEntry) {
+        dao.delete(entry)
+        notesSync.scheduleSyncForEpoch(entry.timestampEpoch)
+    }
 
     fun todayTotals(entries: List<FoodEntry>): NutritionEstimate {
         val consumed = entries.filter { it.consumedEpoch != null }
@@ -218,12 +236,21 @@ class FoodRepository @Inject constructor(
                 fatG = dto.fatG,
                 fiberG = dto.fiberG,
                 sodiumMg = dto.sodiumMg,
+                isVegan = dto.vegan,
+                isVegetarian = dto.vegetarian || dto.vegan,
+                alcoholG = dto.alcoholG,
+                caffeineMg = dto.caffeineMg,
+                sugarG = dto.sugarG,
                 confidence = dto.confidence,
                 notes = dto.notes,
                 modelUsed = model,
             )
         }
 }
+
+/** Enforces the invariant that a vegan entry is always also vegetarian. */
+fun FoodEntry.normalizedVeg(): FoodEntry =
+    if (isVegan && !isVegetarian) copy(isVegetarian = true) else this
 
 /** This entry's nutrition divided across everyone who shared it, e.g. a bottle of soy sauce. */
 val FoodEntry.shareDivisor: Int get() = peopleCount.coerceAtLeast(1)

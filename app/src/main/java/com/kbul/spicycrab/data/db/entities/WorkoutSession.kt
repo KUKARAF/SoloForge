@@ -17,4 +17,6 @@ data class WorkoutSession(
     val restSeconds: Long,
     val notes: String,
     val lastModifiedEpoch: Long,
+    /** True for a lightweight "I stretched today" marker, distinct from a real workout. */
+    val isStretch: Boolean = false,
 )

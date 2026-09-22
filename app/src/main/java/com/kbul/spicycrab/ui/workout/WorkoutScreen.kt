@@ -101,6 +101,8 @@ fun WorkoutScreen(viewModel: WorkoutViewModel = hiltViewModel()) {
             ) { Text("Start workout") }
         }
 
+        StretchRow(stretchedToday = state.stretchedToday, onLogStretch = viewModel::logStretch)
+
         if (state.history.isNotEmpty()) {
             Text("History", style = MaterialTheme.typography.titleMedium)
             state.history.take(20).forEach { session ->
@@ -116,6 +118,22 @@ fun WorkoutScreen(viewModel: WorkoutViewModel = hiltViewModel()) {
             onDelete = viewModel::deleteSession,
             onDismiss = viewModel::dismissEdit,
         )
+    }
+}
+
+@Composable
+private fun StretchRow(stretchedToday: Boolean, onLogStretch: () -> Unit) {
+    if (stretchedToday) {
+        OutlinedButton(
+            onClick = onLogStretch,
+            enabled = false,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) { Text("Stretched today ✓") }
+    } else {
+        OutlinedButton(
+            onClick = onLogStretch,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) { Text("Log stretches") }
     }
 }
 

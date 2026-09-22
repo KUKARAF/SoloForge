@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import com.kbul.spicycrab.MainActivity
 import com.kbul.spicycrab.R
 import com.kbul.spicycrab.data.db.dao.WorkoutSessionDao
+import com.kbul.spicycrab.data.notes.NotesSyncRepository
 import com.kbul.spicycrab.domain.workout.ActiveWorkoutState
 import com.kbul.spicycrab.domain.workout.WorkoutMode
 import com.kbul.spicycrab.domain.workout.WorkoutPhase
@@ -41,6 +42,7 @@ class WorkoutNotificationService : Service() {
 
     @Inject lateinit var stateHolder: WorkoutStateHolder
     @Inject lateinit var dao: WorkoutSessionDao
+    @Inject lateinit var notesSync: NotesSyncRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var tickerJob: Job? = null
@@ -51,6 +53,7 @@ class WorkoutNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> handleStart(intent)
+            ACTION_RECONCILE -> handleReconcile()
             ACTION_TOGGLE_PHASE -> togglePhase()
             ACTION_TOGGLE_PAUSE -> togglePause()
             ACTION_PAUSE -> setPhase(WorkoutPhase.PAUSED)
@@ -92,6 +95,40 @@ class WorkoutNotificationService : Service() {
         if (mode == WorkoutMode.INTERVAL && intervalSec > 0) {
             intervalBeep()  // confirmation beep so user knows audio works
             startBeepLoop()
+        }
+    }
+
+    /**
+     * Re-establishes the ongoing notification after a process restart when a workout is still
+     * marked active in Room, so a forgotten workout is surfaced again. Starts foreground
+     * immediately (5s rule), then reconstructs state from the DB; stops itself if nothing active.
+     */
+    private fun handleReconcile() {
+        startForegroundNotification()
+        scope.launch {
+            val active = dao.getActive()
+            if (active == null) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+            if (stateHolder.current() == null) {
+                val mode = WorkoutMode.fromName(active.modeName)
+                stateHolder.set(
+                    ActiveWorkoutState(
+                        sessionId = active.id,
+                        mode = mode,
+                        startEpoch = active.startEpoch,
+                        intervalSeconds = active.intervalSeconds,
+                        phase = if (mode == WorkoutMode.EXERCISE_REST) WorkoutPhase.PAUSED else WorkoutPhase.EXERCISE,
+                        phaseStartEpoch = System.currentTimeMillis(),
+                        accumulatedExerciseSeconds = active.exerciseSeconds,
+                        accumulatedRestSeconds = active.restSeconds,
+                    )
+                )
+            }
+            runCatching { notifyTick() }
+            startTicker()
         }
     }
 
@@ -169,6 +206,7 @@ class WorkoutNotificationService : Service() {
                         lastModifiedEpoch = now,
                     )
                     dao.update(finalized)
+                    notesSync.scheduleSyncForEpoch(finalized.startEpoch)
                 }
                 stateHolder.set(null)
                 tickerJob?.cancel(); tickerJob = null
@@ -282,7 +320,6 @@ class WorkoutNotificationService : Service() {
 
     private fun buildNotification(): Notification {
         val cur = stateHolder.current()
-        val title = if (cur != null) "Workout · ${cur.mode.displayName}" else "Workout"
         val text = if (cur != null) {
             val totalSec = cur.activeSeconds(System.currentTimeMillis())
             val phaseLabel = when (cur.phase) {
@@ -290,7 +327,7 @@ class WorkoutNotificationService : Service() {
                 WorkoutPhase.REST -> "Resting"
                 WorkoutPhase.PAUSED -> "Paused"
             }
-            "${formatHms(totalSec)} · $phaseLabel"
+            "${cur.mode.displayName} · ${formatHms(totalSec)} · $phaseLabel"
         } else "Active"
 
         val openIntent = Intent(this, MainActivity::class.java).apply {
@@ -301,14 +338,20 @@ class WorkoutNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
+        val stopPi = PendingIntent.getService(
+            this, 1, stopIntent(this),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
         return NotificationCompat.Builder(this, NotificationChannels.ACTIVE_WORKOUT)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
+            .setContentTitle("Workout in progress")
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
+            .addAction(R.drawable.ic_notification, "Stop", stopPi)
             .build()
     }
 
@@ -321,6 +364,7 @@ class WorkoutNotificationService : Service() {
     companion object {
         private const val NOTIF_ID = 1002
         const val ACTION_START = "com.kbul.spicycrab.action.START_WORKOUT"
+        const val ACTION_RECONCILE = "com.kbul.spicycrab.action.RECONCILE_WORKOUT"
         const val ACTION_TOGGLE_PHASE = "com.kbul.spicycrab.action.TOGGLE_PHASE"
         const val ACTION_TOGGLE_PAUSE = "com.kbul.spicycrab.action.TOGGLE_PAUSE"
         const val ACTION_PAUSE = "com.kbul.spicycrab.action.PAUSE_WORKOUT"
@@ -336,6 +380,9 @@ class WorkoutNotificationService : Service() {
                 putExtra(EXTRA_MODE, mode.name)
                 putExtra(EXTRA_INTERVAL_SEC, intervalSec)
             }
+
+        fun reconcileIntent(context: Context): Intent =
+            Intent(context, WorkoutNotificationService::class.java).apply { action = ACTION_RECONCILE }
 
         fun togglePhaseIntent(context: Context): Intent =
             Intent(context, WorkoutNotificationService::class.java).apply { action = ACTION_TOGGLE_PHASE }

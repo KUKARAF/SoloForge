@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.LocalBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
     val presets by viewModel.presets.collectAsStateWithLifecycle()
     val editing by viewModel.editing.collectAsStateWithLifecycle()
     val manualOpen by viewModel.manualOpen.collectAsStateWithLifecycle()
+    val substanceOpen by viewModel.substanceOpen.collectAsStateWithLifecycle()
     val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
     val barcodeScanningEnabled by viewModel.barcodeScanningEnabled.collectAsStateWithLifecycle()
 
@@ -59,6 +61,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onAddClick = { viewModel.goToCapture() },
             onDescribeClick = { viewModel.startTextEntry() },
             onManualClick = { viewModel.openManual() },
+            onSubstanceClick = { viewModel.openSubstance() },
             onRowClick = viewModel::openEdit,
             onLogPreset = viewModel::logPreset,
             onDeletePreset = viewModel::deletePreset,
@@ -101,6 +104,14 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onDismiss = viewModel::dismissManual,
         )
     }
+
+    if (substanceOpen) {
+        ManualSubstanceSheet(
+            builtInKeys = viewModel.substanceKeys,
+            onSave = viewModel::saveSubstance,
+            onDismiss = viewModel::dismissSubstance,
+        )
+    }
 }
 
 @Composable
@@ -111,6 +122,7 @@ private fun FoodListContent(
     onAddClick: () -> Unit,
     onDescribeClick: () -> Unit,
     onManualClick: () -> Unit,
+    onSubstanceClick: () -> Unit,
     onRowClick: (FoodEntry) -> Unit,
     onLogPreset: (MealPreset) -> Unit,
     onDeletePreset: (MealPreset) -> Unit,
@@ -123,6 +135,12 @@ private fun FoodListContent(
                 horizontalAlignment = androidx.compose.ui.Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                SmallFloatingActionButton(
+                    onClick = onSubstanceClick,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    Icon(Icons.Outlined.LocalBar, contentDescription = "Log substance")
+                }
                 SmallFloatingActionButton(
                     onClick = onManualClick,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,

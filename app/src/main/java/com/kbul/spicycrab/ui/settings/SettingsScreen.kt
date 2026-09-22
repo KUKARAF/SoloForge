@@ -1,6 +1,7 @@
 package com.kbul.spicycrab.ui.settings
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +48,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
     val hasGristKey by viewModel.hasGristKey.collectAsStateWithLifecycle()
+    val hasNotesToken by viewModel.hasNotesToken.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val s = settings ?: return
@@ -55,6 +58,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             snackbarHostState.showSnackbar(it)
             viewModel.clearExportMessage()
         }
+    }
+
+    // Pick up a token stored by MainActivity's OIDC deep-link handler when we resume from the browser.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshNotesToken()
+        onPauseOrDispose { }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -126,6 +135,38 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 singleLine = true,
             )
             GristKeyField(hasGristKey, viewModel::setGristApiKey, viewModel::clearGristApiKey)
+        }
+
+        SectionCard("Notes server sync") {
+            Text(
+                "Optional. Mirrors each day's records to a rust_note server at notes.osmosis.page " +
+                    "as a daily note (diary/YYYY-MM-DD) with YAML frontmatter, on top of local " +
+                    "storage. Room stays the source of truth. Paste a device bearer token to enable.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SwitchRow("Sync to notes server", s.notesSyncEnabled, viewModel::setNotesSyncEnabled)
+            if (s.notesSyncEnabled) {
+                OutlinedTextField(
+                    value = s.notesBaseUrl ?: "",
+                    onValueChange = viewModel::setNotesBaseUrl,
+                    label = { Text("Notes server base URL") },
+                    placeholder = { Text("https://notes.osmosis.page") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                NotesSignInRow(
+                    baseUrl = s.notesBaseUrl,
+                    connected = hasNotesToken,
+                    onDisconnect = viewModel::clearNotesToken,
+                )
+                Text(
+                    "Paste a token manually as a fallback:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                NotesTokenField(hasNotesToken, viewModel::setNotesToken, viewModel::clearNotesToken)
+            }
         }
 
         SectionCard("Daily nutrition goals") {
@@ -268,6 +309,61 @@ private fun GristKeyField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () 
         value = input,
         onValueChange = { input = it },
         label = { Text("Grist API key") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { onSet(input); input = "" },
+            enabled = input.isNotBlank(),
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text(if (hasKey) "Replace" else "Save") }
+        if (hasKey) {
+            OutlinedButton(
+                onClick = onClear,
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text("Clear") }
+        }
+    }
+}
+
+@Composable
+private fun NotesSignInRow(baseUrl: String?, connected: Boolean, onDisconnect: () -> Unit) {
+    val context = LocalContext.current
+    Text(
+        if (connected) "Connected to notes server." else "Not connected.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = {
+                val base = (baseUrl?.takeIf { it.isNotBlank() } ?: "https://notes.osmosis.page").trimEnd('/')
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$base/auth/login?client=app"))
+                context.startActivity(intent)
+            },
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text(if (connected) "Re-connect" else "Sign in to notes server") }
+        if (connected) {
+            OutlinedButton(
+                onClick = onDisconnect,
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text("Disconnect") }
+        }
+    }
+}
+
+@Composable
+private fun NotesTokenField(hasKey: Boolean, onSet: (String) -> Unit, onClear: () -> Unit) {
+    var input by remember { mutableStateOf("") }
+    Text(
+        if (hasKey) "A notes bearer token is set." else "No notes token set.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    OutlinedTextField(
+        value = input,
+        onValueChange = { input = it },
+        label = { Text("Notes bearer token") },
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth(),
     )
