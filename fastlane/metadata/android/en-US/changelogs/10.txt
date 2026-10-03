@@ -1,0 +1,1 @@
+Meal analysis now keeps running after you leave the app. If you close the app or switch tabs while a photo or description is being analyzed, the result is saved automatically and you get a notification. If the analysis fails while you are away, the photo and text are kept on the Food tab so you can retry or delete them later.

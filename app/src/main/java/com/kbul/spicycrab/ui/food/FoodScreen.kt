@@ -3,6 +3,8 @@ package com.kbul.spicycrab.ui.food
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +21,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -30,8 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.kbul.spicycrab.data.db.entities.FoodEntry
 import com.kbul.spicycrab.data.db.entities.MealPreset
+import com.kbul.spicycrab.domain.nutrition.FailedAnalysis
 import com.kbul.spicycrab.domain.nutrition.shareCarbsG
 import com.kbul.spicycrab.domain.nutrition.shareFatG
 import com.kbul.spicycrab.domain.nutrition.shareKcal
@@ -52,11 +57,13 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
     val substanceOpen by viewModel.substanceOpen.collectAsStateWithLifecycle()
     val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
     val barcodeScanningEnabled by viewModel.barcodeScanningEnabled.collectAsStateWithLifecycle()
+    val failedAnalyses by viewModel.failedAnalyses.collectAsStateWithLifecycle()
 
     when (val m = mode) {
         FoodUiMode.List -> FoodListContent(
             entries = entries,
             presets = presets,
+            failedAnalyses = failedAnalyses,
             aiEnabled = aiEnabled,
             onAddClick = { viewModel.goToCapture() },
             onDescribeClick = { viewModel.startTextEntry() },
@@ -66,6 +73,8 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onLogPreset = viewModel::logPreset,
             onDeletePreset = viewModel::deletePreset,
             onMarkConsumed = viewModel::markConsumed,
+            onRetryFailed = viewModel::retryFailed,
+            onDeleteFailed = viewModel::deleteFailed,
         )
         FoodUiMode.Capture -> CaptureScreen(
             onCaptured = viewModel::onCaptured,
@@ -81,6 +90,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
             onSave = viewModel::saveEntry,
             onCancel = viewModel::cancelAnalyze,
             onEstimateUpdate = { updated -> viewModel.updateEstimate { updated } },
+            onVisibilityChange = viewModel::onAnalyzeScreenVisible,
         )
     }
 
@@ -118,6 +128,7 @@ fun FoodScreen(viewModel: FoodViewModel = hiltViewModel()) {
 private fun FoodListContent(
     entries: List<FoodEntry>,
     presets: List<MealPreset>,
+    failedAnalyses: List<FailedAnalysis>,
     aiEnabled: Boolean,
     onAddClick: () -> Unit,
     onDescribeClick: () -> Unit,
@@ -127,6 +138,8 @@ private fun FoodListContent(
     onLogPreset: (MealPreset) -> Unit,
     onDeletePreset: (MealPreset) -> Unit,
     onMarkConsumed: (FoodEntry) -> Unit,
+    onRetryFailed: (FailedAnalysis) -> Unit,
+    onDeleteFailed: (FailedAnalysis) -> Unit,
 ) {
     val (pending, consumed) = entries.partition { it.consumedEpoch == null }
     Scaffold(
@@ -170,7 +183,7 @@ private fun FoodListContent(
                 onDelete = onDeletePreset,
                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
             )
-            if (entries.isEmpty()) {
+            if (entries.isEmpty() && failedAnalyses.isEmpty()) {
                 Box(
                     Modifier.fillMaxSize().padding(24.dp),
                     contentAlignment = Alignment.Center,
@@ -188,6 +201,23 @@ private fun FoodListContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
             ) {
+                if (failedAnalyses.isNotEmpty()) {
+                    item(key = "failed-header") {
+                        Text(
+                            "Analysis failed",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    items(failedAnalyses, key = { "failed-${it.id}" }) { item ->
+                        FailedAnalysisRow(
+                            item,
+                            aiEnabled = aiEnabled,
+                            onRetry = { onRetryFailed(item) },
+                            onDelete = { onDeleteFailed(item) },
+                        )
+                    }
+                }
                 if (pending.isNotEmpty()) {
                     item(key = "pending-header") {
                         Text(
@@ -233,6 +263,39 @@ private fun FoodRow(entry: FoodEntry, onClick: () -> Unit) {
             )
             if (entry.comment.isNotBlank()) {
                 Text("“${entry.comment}”", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FailedAnalysisRow(
+    item: FailedAnalysis,
+    aiEnabled: Boolean,
+    onRetry: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val ts = DateTimeFormatter.ofPattern("MMM d · HH:mm")
+        .format(Instant.ofEpochMilli(item.failedEpoch).atZone(ZoneId.systemDefault()))
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                item.imageFile?.let {
+                    AsyncImage(model = it, contentDescription = "Meal photo", modifier = Modifier.size(64.dp))
+                }
+                Column {
+                    Text(item.comment.ifBlank { "Photo without comment" }, style = MaterialTheme.typography.titleMedium)
+                    Text(ts, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Text(item.error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onDelete, modifier = Modifier.weight(1f).height(40.dp)) { Text("Delete") }
+                Button(
+                    onClick = onRetry,
+                    enabled = aiEnabled,
+                    modifier = Modifier.weight(1f).height(40.dp),
+                ) { Text("Retry") }
             }
         }
     }

@@ -10,6 +10,7 @@ object NotificationChannels {
     const val ACTIVE_WORKOUT = "active_workout"
     const val FASTING_REMINDERS = "fasting_reminders"
     const val WEIGHT_REMINDERS = "weight_reminders"
+    const val FOOD_ANALYSIS = "food_analysis"
 
     fun ensureCreated(context: Context) {
         val nm = context.getSystemService<NotificationManager>() ?: return
@@ -40,6 +41,13 @@ object NotificationChannels {
                 "Weight reminders",
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply { description = "Weekly weigh-in reminder" }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                FOOD_ANALYSIS,
+                "Meal analysis",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = "Results of meal analyses that finished after you left the app" }
         )
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import coil.compose.AsyncImage
 import com.kbul.spicycrab.domain.nutrition.NutritionEstimate
 import com.kbul.spicycrab.ui.common.PeopleCountField
@@ -38,7 +39,13 @@ fun AnalyzeScreen(
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onEstimateUpdate: (NutritionEstimate) -> Unit,
+    onVisibilityChange: (Boolean) -> Unit,
 ) {
+    // Analysis keeps running if the user leaves; results arriving while this is stopped are auto-saved.
+    LifecycleStartEffect(Unit) {
+        onVisibilityChange(true)
+        onStopOrDispose { onVisibilityChange(false) }
+    }
     val textOnly = imageFile == null
     Column(
         Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),

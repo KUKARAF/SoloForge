@@ -7,6 +7,10 @@ import com.kbul.spicycrab.data.db.entities.MealPreset
 import com.kbul.spicycrab.data.prefs.SettingsRepo
 import com.kbul.spicycrab.domain.barcode.ProductLookupRepository
 import com.kbul.spicycrab.domain.barcode.toNutritionEstimate
+import com.kbul.spicycrab.domain.nutrition.FailedAnalysis
+import com.kbul.spicycrab.domain.nutrition.FailedAnalysisStore
+import com.kbul.spicycrab.domain.nutrition.FoodAnalysisOutcome
+import com.kbul.spicycrab.domain.nutrition.FoodAnalysisSession
 import com.kbul.spicycrab.domain.nutrition.FoodRepository
 import com.kbul.spicycrab.domain.nutrition.NutritionEstimate
 import com.kbul.spicycrab.domain.nutrition.SubstanceRepository
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
 import javax.inject.Inject
 
 sealed interface FoodUiMode {
@@ -47,6 +52,8 @@ class FoodViewModel @Inject constructor(
     private val repository: FoodRepository,
     private val productLookup: ProductLookupRepository,
     private val substances: SubstanceRepository,
+    private val analysisSession: FoodAnalysisSession,
+    private val failedStore: FailedAnalysisStore,
     settings: SettingsRepo,
 ) : ViewModel() {
 
@@ -59,6 +66,10 @@ class FoodViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private var pendingBarcode: String? = null
+    private var pendingAnalysisId: UUID? = null
+    private var retryingFailedId: String? = null
+
+    val failedAnalyses: StateFlow<List<FailedAnalysis>> = failedStore.items
 
     private val _mode = MutableStateFlow<FoodUiMode>(FoodUiMode.List)
     val mode: StateFlow<FoodUiMode> = _mode.asStateFlow()
@@ -81,12 +92,33 @@ class FoodViewModel @Inject constructor(
     val presets: StateFlow<List<MealPreset>> = repository.observePresets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    init {
+        viewModelScope.launch {
+            analysisSession.outcomes.collect { outcome ->
+                if (outcome.workId != pendingAnalysisId) return@collect
+                pendingAnalysisId = null
+                when (outcome) {
+                    is FoodAnalysisOutcome.Ready ->
+                        _analyze.value = _analyze.value.copy(isLoading = false, estimate = outcome.estimate)
+                    is FoodAnalysisOutcome.Failed ->
+                        _analyze.value = _analyze.value.copy(isLoading = false, error = outcome.message)
+                    is FoodAnalysisOutcome.AutoSaved -> {
+                        retryingFailedId = null
+                        _analyze.value = AnalyzeState(savedOk = true)
+                        _mode.value = FoodUiMode.List
+                    }
+                }
+            }
+        }
+    }
+
     fun goToCapture() {
         pendingBarcode = null
         _mode.value = FoodUiMode.Capture
     }
 
     fun startTextEntry() {
+        retryingFailedId = null
         _analyze.value = AnalyzeState()
         _mode.value = FoodUiMode.Analyze(imageFile = null)
     }
@@ -96,6 +128,7 @@ class FoodViewModel @Inject constructor(
     }
 
     fun onCaptured(file: File) {
+        retryingFailedId = null
         _analyze.value = AnalyzeState()
         _mode.value = FoodUiMode.Analyze(file)
 
@@ -129,13 +162,11 @@ class FoodViewModel @Inject constructor(
         val comment = _analyze.value.comment
         if (file == null && comment.isBlank()) return
         _analyze.value = _analyze.value.copy(isLoading = true, error = null)
-        viewModelScope.launch {
-            val result = if (file != null) repository.analyze(file, comment) else repository.analyzeText(comment)
-            _analyze.value = result.fold(
-                onSuccess = { _analyze.value.copy(isLoading = false, estimate = it) },
-                onFailure = { _analyze.value.copy(isLoading = false, error = it.message ?: "Analysis failed") },
-            )
-        }
+        pendingAnalysisId = analysisSession.submit(file, comment, retryingFailedId)
+    }
+
+    fun onAnalyzeScreenVisible(visible: Boolean) {
+        analysisSession.setScreenVisible(visible)
     }
 
     fun updateEstimate(transform: (NutritionEstimate) -> NutritionEstimate) {
@@ -150,6 +181,8 @@ class FoodViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.save(est, _analyze.value.comment, imageFile) }
                 .onSuccess {
+                    retryingFailedId?.let { failedStore.remove(it) }
+                    retryingFailedId = null
                     _analyze.value = AnalyzeState(savedOk = true)
                     _mode.value = FoodUiMode.List
                 }
@@ -160,8 +193,21 @@ class FoodViewModel @Inject constructor(
     }
 
     fun cancelAnalyze() {
+        pendingAnalysisId?.let(analysisSession::cancel)
+        pendingAnalysisId = null
+        retryingFailedId = null
         _analyze.value = AnalyzeState()
         _mode.value = FoodUiMode.List
+    }
+
+    fun retryFailed(item: FailedAnalysis) {
+        retryingFailedId = item.id
+        _analyze.value = AnalyzeState(comment = item.comment)
+        _mode.value = FoodUiMode.Analyze(item.imageFile)
+    }
+
+    fun deleteFailed(item: FailedAnalysis) {
+        viewModelScope.launch { failedStore.remove(item.id) }
     }
 
     fun openEdit(entry: FoodEntry) {
