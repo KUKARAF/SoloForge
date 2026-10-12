@@ -47,3 +47,8 @@ data class StatRegistryRequest(
     val chart: String,
     val agg: String,
 )
+
+@Serializable
+data class SetRecurringDoneRequest(
+    val done: Boolean,
+)

@@ -136,6 +136,17 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
         if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
     }
 
+    /** Marks a local recurring todo done in the server's "today" (resolved in the user's server-side timezone). */
+    suspend fun setRecurringDone(config: NotesConfig, key: String, done: Boolean): Result<Unit> = runCatching {
+        val resp: HttpResponse = client.post(recurringDoneUrl(config, key)) {
+            bearer(config)
+            contentType(ContentType.Application.Json)
+            setBody(SetRecurringDoneRequest(done))
+        }
+        val raw = resp.bodyAsText()
+        if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
+    }
+
     private fun io.ktor.client.request.HttpRequestBuilder.bearer(config: NotesConfig) {
         headers { append(HttpHeaders.Authorization, "Bearer ${config.token}") }
     }
@@ -144,6 +155,8 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
     private fun notesUrl(config: NotesConfig): String = "${base(config)}/api/notes"
     private fun noteUrl(config: NotesConfig, path: String): String =
         "${base(config)}/api/notes/${path.trim('/').encodeURLPath()}"
+    private fun recurringDoneUrl(config: NotesConfig, key: String): String =
+        "${base(config)}/api/recurring/${key.trim('/').encodeURLPath()}/done"
     private fun statsUrl(config: NotesConfig): String = "${base(config)}/api/stats"
     private fun statsRegistryUrl(config: NotesConfig, metric: String): String =
         "${base(config)}/api/stats/registry/${metric.trim('/').encodeURLPath()}"

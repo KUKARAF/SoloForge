@@ -86,6 +86,12 @@ class NotesSyncRepository @Inject constructor(
         }
     }
 
+    /** Marks a recurring todo done on the server; no-op success when sync is off. */
+    suspend fun markRecurringDone(key: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val config = config() ?: return@withContext Result.success(Unit)
+        notesClient.setRecurringDone(config, key, done = true)
+    }
+
     suspend fun deleteDay(date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         val config = config() ?: return@withContext Result.success(Unit)
         notesClient.deleteNote(config, DailyNoteMapper.notePath(date))

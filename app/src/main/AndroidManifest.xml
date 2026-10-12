@@ -10,6 +10,13 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- OpenTracks public API: start/stop GPS recording with a workout. -->
+    <queries>
+        <package android:name="de.dennisguse.opentracks" />
+        <package android:name="de.dennisguse.opentracks.playStore" />
+        <package android:name="de.dennisguse.opentracks.nightly" />
+    </queries>
+
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />

@@ -10,7 +10,7 @@ A **local-first Android fitness app**. No backend, no auth, no analytics, no clo
    - Cancellation is automatic when the user takes the opposite action
 2. **AI calorie counter** — user supplies their OpenRouter key, then either snaps a photo (with optional comment) or types a description ("100 g watermelon"); gets structured macros back, edits if needed, saves locally. Analysis runs in `FoodAnalysisWorker` (WorkManager); if the Analyze screen is no longer visible when the result arrives (app closed, tab switched), the entry is saved without confirmation and a notification is posted. Background failures are kept by `FailedAnalysisStore` (photo + text in app-private `files/failed_analyses/`, not in the backup) and listed on the Food tab for manual retry or delete. Model choice is automatic through the escalation chain in `FoodAnalysisModels`. Non-AI paths: manual entry and one-tap meal presets ("Quick add"). The `ai_features_enabled` setting (default on) hides every AI entry point.
 3. **Weight tracking** — manual entries, line chart, edit/delete, weekly weigh-in reminder. Food and weight entries have editable date/time (backdating allowed, future dates blocked).
-4. **Workout timer** — simple, interval, and exercise/rest timers with local workout logging and dashboard calorie bonus.
+4. **Workout timer** — simple, interval, and exercise/rest timers with local workout logging and dashboard calorie bonus. "Start workout"/"Stop" also start/stop GPS recording in OpenTracks via its public API (`integrations/OpenTracks.kt`; user must enable the API in OpenTracks). "Start workout" and "Log stretches" mark the notes-server recurring todos `excercise` / `stretches` done (`RecurringTodoWorker`, `POST /api/recurring/{key}/done`, retried until online; no-op when notes sync is off).
 5. **Home dashboard** — at-a-glance tiles for fasting, today's nutrition vs. goals, weight, workout time, and streak.
 6. **FOSS/privacy branding** — first-run intro and Settings/About emphasize GPL-3.0, no backend, no accounts, no analytics, and local-first data ownership without adding persistent dashboard clutter.
 
@@ -102,31 +102,18 @@ Solo Forge is licensed under the **GNU General Public License v3.0**. The full l
 
 ## Release process
 
-Three distribution channels with different signing keys (builds are not cross-installable):
+Single-person fork; the only distribution channel is GitHub Releases (no F-Droid, no Google Play).
 
-1. **Version bump**: `versionCode` + `versionName` in `app/build.gradle.kts`, and add
-   `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (plain prose, ~1 short paragraph).
-2. **Commit + tag** `vX.Y.Z` and push. **The tag push IS the F-Droid release** — fdroiddata uses
-   `UpdateCheckMode: Tags` + `AutoUpdateMode: Version`; their bot picks it up and publishes in ~2–7 days.
-3. **GitHub release**: `gh release create vX.Y.Z` with notes and a **debug-signed APK** named
-   `SoloForge-X.Y.Z-debug.apk`. GitHub releases have always been debug-key-signed; switching keys would
-   break in-place updates (and lose local data) for existing GitHub users, so keep the debug key.
-4. **Google Play**: separate track, signed AAB via the upload key (`.\gradlew.bat bundleRelease`,
-   reads `keystore.properties` at repo root, gitignored). Never upload a new AAB while a Play review
-   is pending.
+1. **Version bump**: `versionCode` + `versionName` in `app/build.gradle.kts`.
+2. **Commit + push `main`**, wait for the `CI` workflow to pass.
+3. **Tag `vX.Y.Z` and push the tag.** `.github/workflows/release.yml` builds `assembleRelease`, signs it
+   with the release keystore from GitHub Actions secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
+   `KEY_ALIAS`, `KEY_PASSWORD`), verifies the signature, and publishes a GitHub Release with
+   `soloforge-vX.Y.Z.apk` and generated notes. Watch it with `gh run watch`.
 
-### Website
-
-The project site is **https://soloforge.dimitroff.work** — a two-page static site (landing + privacy
-policy) in a separate repo, `kirilan/soloforge-site` (local checkout: `C:\Users\kiril\soloforge-site`),
-auto-deployed by Cloudflare Pages on push to `main`. The landing page mirrors the fastlane store
-listing (copy, screenshots, badges), so when a release changes features, screenshots, or the store
-description, update the site too. The privacy page is the Google Play privacy-policy URL — keep it
-in sync with the privacy guarantees below. Website edits happen in that repo, never in this one.
-
-### F-Droid metadata
-
-F-Droid listing content is pulled from `fastlane/metadata/android/en-US/`. The OpenRouter food feature is disclosed as `NonFreeNet` per-build in the repo's `.fdroid.yml`, but the official fdroiddata recipe deliberately has **no** `AntiFeatures:` — the F-Droid reviewer removed it during inclusion review (fdroiddata MR !38080, "Remove the AF") because the feature is off by default, opt-in, and needs the user's own key. Do not re-add it to fdroiddata.
+All releases since v0.8.0 are signed with that keystore, so keep using it — a different key breaks
+in-place updates. Local `bundleRelease`/`assembleRelease` signing only applies if a gitignored
+`keystore.properties` exists at the repo root.
 
 ## Privacy guarantees (don't break these)
 

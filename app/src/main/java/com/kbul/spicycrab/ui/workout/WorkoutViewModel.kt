@@ -6,6 +6,8 @@ import com.kbul.spicycrab.data.db.entities.WorkoutSession
 import com.kbul.spicycrab.domain.workout.ActiveWorkoutState
 import com.kbul.spicycrab.domain.workout.WorkoutMode
 import com.kbul.spicycrab.domain.workout.WorkoutRepository
+import com.kbul.spicycrab.integrations.OpenTracks
+import com.kbul.spicycrab.notifications.RecurringTodos
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,8 @@ data class WorkoutUiState(
 @HiltViewModel
 class WorkoutViewModel @Inject constructor(
     private val repository: WorkoutRepository,
+    private val openTracks: OpenTracks,
+    private val recurringTodos: RecurringTodos,
 ) : ViewModel() {
 
     private val ticker = flow {
@@ -67,6 +71,8 @@ class WorkoutViewModel @Inject constructor(
     fun onIntervalMinutesChange(minutes: Double) { intervalMinutes.value = minutes.coerceIn(0.01, 240.0) }
 
     fun start() {
+        openTracks.startRecording()
+        recurringTodos.markExerciseDone()
         viewModelScope.launch {
             repository.start(
                 mode = selectedMode.value,
@@ -80,6 +86,7 @@ class WorkoutViewModel @Inject constructor(
     fun pause() = repository.pause()
 
     fun stop() {
+        openTracks.stopRecording()
         viewModelScope.launch { repository.stop() }
     }
 
@@ -99,6 +106,7 @@ class WorkoutViewModel @Inject constructor(
     }
 
     fun logStretch() {
+        recurringTodos.markStretchesDone()
         viewModelScope.launch { repository.logStretch() }
     }
 }
