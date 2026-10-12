@@ -153,7 +153,7 @@ class DailyNoteMapperTest {
     fun workoutSessionMakesWorkoutTrue() {
         val note = build(workouts = listOf(workout(isStretch = false)))
         assertEquals("true", note.frontmatter["workout"])
-        assertEquals("false", note.frontmatter["stretches"])
+        assertFalse(note.frontmatter.containsKey("stretches"))
     }
 
     @Test
@@ -173,10 +173,10 @@ class DailyNoteMapperTest {
     }
 
     @Test
-    fun noSessionsMakesBothFalse() {
+    fun noSessionsMakesWorkoutFalseAndOmitsStretches() {
         val note = build()
         assertEquals("false", note.frontmatter["workout"])
-        assertEquals("false", note.frontmatter["stretches"])
+        assertFalse(note.frontmatter.containsKey("stretches"))
     }
 
     @Test
@@ -187,7 +187,7 @@ class DailyNoteMapperTest {
         assertFalse(note.frontmatter.containsKey("salt_g"))
         assertFalse(note.frontmatter.containsKey("kcal"))
         assertTrue(note.frontmatter.containsKey("workout"))
-        assertTrue(note.frontmatter.containsKey("stretches"))
+        assertFalse(note.frontmatter.containsKey("stretches"))
         assertEquals("2026-09-20", note.frontmatter["date"])
         assertEquals("", note.body)
     }
@@ -248,6 +248,18 @@ class DailyNoteMapperTest {
         assertEquals("true", merged.frontmatter["workout"])
         // SoloForge owns the body (the journal).
         assertEquals("my journal body", merged.body)
+    }
+
+    @Test
+    fun renderMergedNeverUnticksStretchesSetOnTheServer() {
+        val existing = """
+            ---
+            date: 2026-09-20
+            stretches: true
+            ---
+        """.trimIndent()
+        val merged = DailyNoteMapper.parse(DailyNoteMapper.renderMerged(build(), existing))
+        assertEquals("true", merged.frontmatter["stretches"])
     }
 
     @Test

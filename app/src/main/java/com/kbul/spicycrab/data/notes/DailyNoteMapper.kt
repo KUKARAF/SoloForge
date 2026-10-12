@@ -42,7 +42,7 @@ object DailyNoteMapper {
     val MANAGED_KEYS: Set<String> = setOf(
         "date", "kcal", "protein", "carbs", "fat", "fiber", "food_entries",
         "vegan", "vegetarian", "salt_g", "fasted_hours", "weight_kg",
-        "workout_minutes", "workout", "stretches", "last_modified",
+        "workout_minutes", "workout", "last_modified",
     )
 
     /** `diary/YYYY-MM-DD` id used to address a day's note on the server. */
@@ -100,9 +100,10 @@ object DailyNoteMapper {
         workouts.filter { it.endEpoch != null && !it.isStretch }.takeIf { it.isNotEmpty() }?.let { done ->
             fm["workout_minutes"] = num(done.sumOf { it.totalSeconds } / 60.0)
         }
-        // Per-day booleans, always emitted: a real (non-stretch) session vs. a stretch marker.
         fm["workout"] = bool(workouts.any { !it.isStretch })
-        fm["stretches"] = bool(workouts.any { it.isStretch })
+        // `stretches` doubles as the notes-server recurring todo, which can also be ticked on the
+        // web. It is never managed, so a sync only ever sets it true and never un-ticks it.
+        if (workouts.any { it.isStretch }) fm["stretches"] = "true"
 
         val lastModified = buildList {
             addAll(foods.map { it.lastModifiedEpoch })

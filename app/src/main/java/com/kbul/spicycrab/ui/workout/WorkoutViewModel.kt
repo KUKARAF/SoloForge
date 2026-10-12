@@ -44,6 +44,7 @@ class WorkoutViewModel @Inject constructor(
         }
     }
 
+    private val stretchedRemotely = MutableStateFlow(false)
     private val selectedMode = MutableStateFlow(WorkoutMode.SIMPLE)
     private val intervalMinutes = MutableStateFlow(2.0)
 
@@ -62,6 +63,8 @@ class WorkoutViewModel @Inject constructor(
             intervalMinutes = interval,
             stretchedToday = all.any { it.isStretch && isSameDay(it.startEpoch, now) },
         )
+    }.combine(stretchedRemotely) { state, remote ->
+        state.copy(stretchedToday = state.stretchedToday || remote)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WorkoutUiState())
 
     private val _editing = MutableStateFlow<WorkoutSession?>(null)
@@ -103,6 +106,10 @@ class WorkoutViewModel @Inject constructor(
             repository.delete(session)
             _editing.value = null
         }
+    }
+
+    fun refreshStretches() {
+        viewModelScope.launch { stretchedRemotely.value = recurringTodos.stretchesDoneRemotely() }
     }
 
     fun logStretch() {

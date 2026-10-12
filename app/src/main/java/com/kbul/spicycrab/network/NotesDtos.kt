@@ -52,3 +52,14 @@ data class StatRegistryRequest(
 data class SetRecurringDoneRequest(
     val done: Boolean,
 )
+
+@Serializable
+data class RecurringListResponse(
+    val todos: List<RecurringTodoStatus> = emptyList(),
+)
+
+@Serializable
+data class RecurringTodoStatus(
+    val key: String,
+    val done: Boolean,
+)

@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -101,6 +102,10 @@ fun WorkoutScreen(viewModel: WorkoutViewModel = hiltViewModel()) {
             ) { Text("Start workout") }
         }
 
+        LifecycleResumeEffect(Unit) {
+            viewModel.refreshStretches()
+            onPauseOrDispose { }
+        }
         StretchRow(stretchedToday = state.stretchedToday, onLogStretch = viewModel::logStretch)
 
         if (state.history.isNotEmpty()) {

@@ -136,6 +136,15 @@ class NotesClient internal constructor(engine: HttpClientEngine) {
         if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
     }
 
+    suspend fun getRecurring(config: NotesConfig): Result<List<RecurringTodoStatus>> = runCatching {
+        val resp: HttpResponse = client.get("${base(config)}/api/recurring") {
+            bearer(config)
+        }
+        val raw = resp.bodyAsText()
+        if (!resp.status.isSuccess()) error("Notes ${resp.status.value}: ${raw.take(300)}")
+        json.decodeFromString(RecurringListResponse.serializer(), raw).todos
+    }
+
     /** Marks a local recurring todo done in the server's "today" (resolved in the user's server-side timezone). */
     suspend fun setRecurringDone(config: NotesConfig, key: String, done: Boolean): Result<Unit> = runCatching {
         val resp: HttpResponse = client.post(recurringDoneUrl(config, key)) {

@@ -92,6 +92,12 @@ class NotesSyncRepository @Inject constructor(
         notesClient.setRecurringDone(config, key, done = true)
     }
 
+    /** Today's done-state of a recurring todo on the server, or null when sync is off or unreachable. */
+    suspend fun isRecurringDone(key: String): Boolean? = withContext(Dispatchers.IO) {
+        val config = config() ?: return@withContext null
+        notesClient.getRecurring(config).getOrNull()?.firstOrNull { it.key == key }?.done
+    }
+
     suspend fun deleteDay(date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         val config = config() ?: return@withContext Result.success(Unit)
         notesClient.deleteNote(config, DailyNoteMapper.notePath(date))

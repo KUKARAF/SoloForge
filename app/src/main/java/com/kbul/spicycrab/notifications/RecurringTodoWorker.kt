@@ -23,9 +23,16 @@ import javax.inject.Singleton
 @Singleton
 class RecurringTodos @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val notesSync: NotesSyncRepository,
 ) {
-    fun markExerciseDone() = RecurringTodoWorker.enqueue(context, "excercise")
-    fun markStretchesDone() = RecurringTodoWorker.enqueue(context, "stretches")
+    fun markExerciseDone() = RecurringTodoWorker.enqueue(context, EXERCISE)
+    fun markStretchesDone() = RecurringTodoWorker.enqueue(context, STRETCHES)
+    suspend fun stretchesDoneRemotely(): Boolean = notesSync.isRecurringDone(STRETCHES) == true
+
+    private companion object {
+        const val EXERCISE = "excercise"
+        const val STRETCHES = "stretches"
+    }
 }
 
 /** Marks a notes-server recurring todo (e.g. `excercise`, `stretches`) done, retrying until online. */
